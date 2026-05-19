@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HX B2B Partner Opportunities Forecast Model</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/prop-types/prop-types.min.js" crossorigin></script>
+  <!-- Recharts must load before Babel: Babel's module/exports globals trick the Recharts UMD into CommonJS mode -->
+  <script src="https://cdn.jsdelivr.net/npm/recharts@2.13.3/umd/Recharts.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>* { box-sizing: border-box; margin: 0; padding: 0; }</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+const { useState, useMemo, useCallback } = React;
+const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } = Recharts;
+
+const T = {
+  purple: "#542E91", purpleDark: "#47277B", purpleTint: "#eeeaf4",
+  yellow: "#FDDC06", yellowDark: "#d7b505", yellowTint: "#fffbe6",
+  black: "#232323", white: "#ffffff", offWhite: "#F0F0F0",
+  grey1: "#c2c2c5", grey2: "#d7d7d9", grey3: "#ededee", grey4: "#f7f7f7",
+  greyText: "#737373",
+  green: "#00B0A6", greenBg: "#e5f1f0",
+  red: "#FF5F68", redBg: "#fae5e6",
+  blue: "#3AA6FF", blueBg: "#e5f0f9",
+  orange: "#FFB55F", orangeBg: "#f3dbcc",
+  violet: "#925FFF",
+};
+
+const INITIAL_COUNTRIES = [
+  { id: "GB", name: "United Kingdom", region: "British Isles", annualPax: 290000000, language: "en", currency: "GBP", hxLang: true, hxCurrency: true },
+  { id: "IE", name: "Ireland", region: "British Isles", annualPax: 38000000, language: "en", currency: "EUR", hxLang: true, hxCurrency: true },
+  { id: "DE", name: "Germany", region: "DACH", annualPax: 220000000, language: "de", currency: "EUR", hxLang: true, hxCurrency: true },
+  { id: "FR", name: "France", region: "Western Europe", annualPax: 180000000, language: "fr", currency: "EUR", hxLang: false, hxCurrency: true },
+  { id: "NL", name: "Netherlands", region: "Benelux", annualPax: 75000000, language: "nl", currency: "EUR", hxLang: false, hxCurrency: true },
+  { id: "BE", name: "Belgium", region: "Benelux", annualPax: 55000000, language: "fr/nl", currency: "EUR", hxLang: false, hxCurrency: true },
+  { id: "ES", name: "Spain", region: "Iberia", annualPax: 160000000, language: "es", currency: "EUR", hxLang: false, hxCurrency: true },
+  { id: "IT", name: "Italy", region: "Southern Europe", annualPax: 95000000, language: "it", currency: "EUR", hxLang: false, hxCurrency: true },
+  { id: "PL", name: "Poland", region: "Eastern Europe", annualPax: 40000000, language: "pl", currency: "PLN", hxLang: false, hxCurrency: false },
+  { id: "SE", name: "Sweden", region: "Nordics", annualPax: 35000000, language: "sv", currency: "SEK", hxLang: false, hxCurrency: false },
+  { id: "CH", name: "Switzerland", region: "DACH", annualPax: 28000000, language: "de/fr", currency: "CHF", hxLang: true, hxCurrency: false },
+  { id: "AT", name: "Austria", region: "DACH", annualPax: 22000000, language: "de", currency: "EUR", hxLang: true, hxCurrency: true },
+];
+
+const PRODUCTS = ["On-Airport Parking", "Off-Airport Parking", "Hotels", "Lounges", "Fast Track", "Transfers", "Car Hire"];
+const CHANNEL = { API: "API", WHITE_LABEL: "White Label", BOTH: "Both" };
+
+const INITIAL_AVAILABILITY = {
+  GB: { "On-Airport Parking": "live",    "Off-Airport Parking": "live",    Hotels: "live",        Lounges: "live",          "Fast Track": "live",          Transfers: "live",    "Car Hire": "live"    },
+  IE: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "live",        Lounges: "planned",       "Fast Track": "not available", Transfers: "planned", "Car Hire": "unknown" },
+  DE: { "On-Airport Parking": "live",    "Off-Airport Parking": "live",     Hotels: "planned",     Lounges: "planned",       "Fast Track": "not available", Transfers: "live",    "Car Hire": "unknown" },
+  FR: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "live",        Lounges: "not available", "Fast Track": "not available", Transfers: "planned", "Car Hire": "unknown" },
+  NL: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "planned",     Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "unknown" },
+  BE: { "On-Airport Parking": "planned", "Off-Airport Parking": "planned",  Hotels: "not available", Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "not available" },
+  ES: { "On-Airport Parking": "live",    "Off-Airport Parking": "live",     Hotels: "live",        Lounges: "live",          "Fast Track": "live",          Transfers: "live",    "Car Hire": "live"    },
+  IT: { "On-Airport Parking": "planned", "Off-Airport Parking": "planned",  Hotels: "not available", Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "unknown" },
+  PL: { "On-Airport Parking": "planned", "Off-Airport Parking": "not available", Hotels: "not available", Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "not available" },
+  SE: { "On-Airport Parking": "unknown", "Off-Airport Parking": "unknown",  Hotels: "unknown",     Lounges: "unknown",       "Fast Track": "unknown",       Transfers: "unknown", "Car Hire": "unknown" },
+  CH: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "live",        Lounges: "planned",       "Fast Track": "not available", Transfers: "planned", "Car Hire": "unknown" },
+  AT: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "live",        Lounges: "planned",       "Fast Track": "not available", Transfers: "not available", "Car Hire": "unknown" },
+};
+
+const INITIAL_PARTNERS = [];
+
+const GP_DEFAULTS = { "On-Airport Parking": 14.00, "Off-Airport Parking": 10.00, Hotels: 18.00, Lounges: 8.00, "Fast Track": 5.50, Transfers: 15.00, "Car Hire": 22.00 };
+const API_AR_DEFAULTS = { "On-Airport Parking": 0.050, "Off-Airport Parking": 0.035, Hotels: 0.025, Lounges: 0.012, "Fast Track": 0.008, Transfers: 0.018, "Car Hire": 0.010 };
+const WL_CR_DEFAULTS  = { "On-Airport Parking": 0.032, "Off-Airport Parking": 0.025, Hotels: 0.018, Lounges: 0.008, "Fast Track": 0.005, Transfers: 0.012, "Car Hire": 0.007 };
+const SCENARIO_MULT = { conservative: 0.6, base: 1.0, stretch: 1.4 };
+const PARTNER_CHANNEL_SHARE = 0.3;
+const EMPTY_PARTNER = { id: "", name: "", channel: CHANNEL.API, countries: [], products: [], pax: 0, committed: false, notes: "" };
+
+const isActive = (status) => status === "live" || status === "planned";
+const toggleInArray = (arr, val) => arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val];
+
+const fmt = (n, d = 0) => isNaN(n) ? "—" : Number(n).toLocaleString("en-GB", { maximumFractionDigits: d, minimumFractionDigits: d });
+const fmtMoney = (n, prefix = "") => n >= 1000000 ? `${prefix}${fmt(n / 1000000, 1)}M` : n >= 1000 ? `${prefix}${fmt(n / 1000, 0)}K` : `${prefix}${fmt(n, 0)}`;
+const fmtGP  = (n) => fmtMoney(n, "£");
+const fmtNum = (n) => fmtMoney(n);
+
+const STATUS_CFG = {
+  live: { label: "Live", bg: "#e5f1f0", color: "#00B0A6" },
+  planned: { label: "Planned", bg: "#e5f0f9", color: "#3AA6FF" },
+  "not available": { label: "Not Available", bg: "#fae5e6", color: "#FF5F68" },
+  unknown: { label: "Unknown", bg: "#f3dbcc", color: "#FFB55F" },
+};
+
+const ASSUMPTION_LABEL_STYLE = { display: "block", fontSize: 11, fontWeight: 700, color: T.greyText, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 };
+
+const CHANNEL_BADGE_CFG = {
+  [CHANNEL.API]:         { bg: "#e5f0f9", color: "#3AA6FF" },
+  [CHANNEL.WHITE_LABEL]: { bg: "#eeeaf4", color: "#542E91" },
+  [CHANNEL.BOTH]:        { bg: "#e5f1f0", color: "#00B0A6" },
+};
+
+function ChannelBadge({ channel }) {
+  const c = CHANNEL_BADGE_CFG[channel] ?? CHANNEL_BADGE_CFG[CHANNEL.API];
+  return <span style={{ fontSize: 10, fontWeight: 700, background: c.bg, color: c.color, borderRadius: 4, padding: "2px 6px" }}>{channel}</span>;
+}
+
+function SectionHeader({ title, sub }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: T.black }}>{title}</h2>
+      {sub && <p style={{ margin: "4px 0 0", fontSize: 13, color: T.greyText }}>{sub}</p>}
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub, accent, icon }) {
+  return (
+    <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.grey2}`, borderTop: `3px solid ${accent || T.purple}` }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: T.greyText, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{icon} {label}</div>
+      <div style={{ fontSize: 28, fontWeight: 800, color: T.black, lineHeight: 1.1 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: T.greyText, marginTop: 4 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function ChartCard({ title, children }) {
+  return (
+    <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.grey2}` }}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function ScenarioPill({ scenario, setScenario }) {
+  const colors = { conservative: T.orange, base: T.blue, stretch: T.green };
+  return (
+    <div style={{ display: "flex", background: "rgba(255,255,255,0.1)", borderRadius: 8, overflow: "hidden" }}>
+      {["conservative", "base", "stretch"].map(s => (
+        <button key={s} onClick={() => setScenario(s)} style={{
+          background: scenario === s ? colors[s] : "transparent",
+          color: scenario === s ? T.white : "rgba(255,255,255,0.6)",
+          border: "none", padding: "7px 12px", cursor: "pointer", fontFamily: "inherit",
+          fontWeight: 700, fontSize: 11, textTransform: "capitalize",
+        }}>{s}</button>
+      ))}
+    </div>
+  );
+}
+
+function Dashboard({ forecast, scenario }) {
+  const { byProduct, byPartner, totalGP, totalBookings, apiOpp, wlOpp } = forecast;
+  const scColors = { conservative: T.orange, base: T.blue, stretch: T.green };
+
+  const { countryChart, gapSummary } = useMemo(() => {
+    const countryChart = [...forecast.byCountry]
+      .sort((a, b) => b.totalGP - a.totalGP).slice(0, 8)
+      .map(c => ({ name: c.name, GP: Math.round(c.totalGP / 1000) }));
+    const gapSummary = forecast.byCountry
+      .flatMap(c => c.gaps)
+      .reduce((acc, g) => { acc[g] = (acc[g] || 0) + 1; return acc; }, {});
+    return { countryChart, gapSummary };
+  }, [forecast.byCountry]);
+
+  const productChart = useMemo(
+    () => byProduct.map(p => ({ name: p.product, GP: Math.round(p.gp / 1000) })),
+    [byProduct]
+  );
+
+  return (
+    <div>
+      <div style={{ background: `${scColors[scenario]}18`, border: `1px solid ${scColors[scenario]}40`, borderRadius: 10, padding: "10px 16px", marginBottom: 20 }}>
+        <span style={{ fontWeight: 700, color: scColors[scenario], textTransform: "capitalize", fontSize: 13 }}>● {scenario} scenario — </span>
+        <span style={{ fontSize: 13, color: T.greyText }}>{SCENARIO_MULT[scenario] * 100}% of base attach rates applied</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+        <StatCard label="Total Forecast GP" value={fmtGP(totalGP)} sub="Annual, all products" accent={T.purple} icon="💰" />
+        <StatCard label="Forecast Bookings" value={fmtNum(totalBookings)} sub="Annual, all countries" accent={T.green} icon="✈️" />
+        <StatCard label="API Opportunity" value={fmtGP(apiOpp)} sub="Via API partners" accent={T.blue} icon="🔌" />
+        <StatCard label="White Label Opp." value={fmtGP(wlOpp)} sub="Via white label partners" accent={T.orange} icon="🏷️" />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 16 }}>
+        <ChartCard title="Forecast GP by Country (£K)">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={countryChart}>
+              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip formatter={v => [`£${v}K`, "GP"]} contentStyle={{ borderRadius: 8, fontFamily: "inherit" }} />
+              <Bar dataKey="GP" fill={T.purple} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+        <ChartCard title="GP by Product (£K)">
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={productChart} layout="vertical">
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={70} />
+              <Tooltip formatter={v => [`£${v}K`, "GP"]} contentStyle={{ borderRadius: 8 }} />
+              <Bar dataKey="GP" fill={T.yellow} radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <ChartCard title="Top Partners by Forecast GP">
+          {[...byPartner].sort((a, b) => b.totalGP - a.totalGP).slice(0, 5).map((p, i) => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < 4 ? `1px solid ${T.grey3}` : "none" }}>
+              <span style={{ fontSize: 16 }}>{["🥇","🥈","🥉","4️⃣","5️⃣"][i]}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>{p.name}</div>
+                <div style={{ fontSize: 11, color: T.greyText }}>{p.channel} · {p.countries.length} countries</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontWeight: 700, color: T.purple }}>{fmtGP(p.totalGP)}</div>
+                <ChannelBadge channel={p.channel} />
+              </div>
+            </div>
+          ))}
+        </ChartCard>
+        <ChartCard title="Capability Gaps">
+          <div style={{ fontSize: 12, color: T.greyText, marginBottom: 12 }}>Issues reducing forecast potential</div>
+          {Object.entries(gapSummary).sort((a, b) => b[1] - a[1]).slice(0, 7).map(([gap, count]) => (
+            <div key={gap} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{gap}</div>
+                <div style={{ height: 4, background: T.grey3, borderRadius: 2, marginTop: 3 }}>
+                  <div style={{ height: 4, width: `${(count / INITIAL_COUNTRIES.length) * 100}%`, background: T.red, borderRadius: 2 }} />
+                </div>
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 700, color: T.red, minWidth: 20 }}>{count}</span>
+            </div>
+          ))}
+        </ChartCard>
+      </div>
+    </div>
+  );
+}
+
+function CountriesView({ forecast, setCountries }) {
+  const [editId, setEditId] = useState(null);
+  const [editVal, setEditVal] = useState({});
+  return (
+    <div>
+      <SectionHeader title="Country Forecast" sub="Click Edit to update annual passenger numbers — forecast recalculates instantly" />
+      <div style={{ background: T.white, borderRadius: 12, border: `1px solid ${T.grey2}`, overflow: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: T.purple, color: T.white }}>
+              {["Country","Region","Annual Pax","Est. Bookings","Forecast Bookings","Forecast GP","Language","Currency","Gaps",""].map(h => (
+                <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {forecast.byCountry.map((c, i) => (
+              <tr key={c.id} style={{ background: i % 2 === 0 ? T.white : T.grey4, borderBottom: `1px solid ${T.grey3}` }}>
+                <td style={{ padding: "12px 16px", fontWeight: 700 }}>{c.name}</td>
+                <td style={{ padding: "12px 16px", fontSize: 13, color: T.greyText }}>{c.region}</td>
+                <td style={{ padding: "12px 16px" }}>
+                  {editId === c.id
+                    ? <input type="number" value={editVal.annualPax} onChange={e => setEditVal({ annualPax: e.target.value })}
+                        style={{ width: 120, border: `2px solid ${T.purple}`, borderRadius: 6, padding: "4px 8px", fontFamily: "inherit", fontSize: 13 }} />
+                    : <span style={{ fontWeight: 600 }}>{fmtNum(c.annualPax)}</span>}
+                </td>
+                <td style={{ padding: "12px 16px", fontSize: 13, color: T.greyText }}>{fmtNum(c.estBookings)}</td>
+                <td style={{ padding: "12px 16px", fontWeight: 700, color: T.purple }}>{fmtNum(c.totalBookings)}</td>
+                <td style={{ padding: "12px 16px", fontWeight: 800, color: T.green }}>{fmtGP(c.totalGP)}</td>
+                <td style={{ padding: "12px 16px" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.hxLang ? T.green : T.red, display: "inline-block" }} />
+                    <span style={{ color: c.hxLang ? T.black : T.red, fontWeight: c.hxLang ? 400 : 600 }}>{c.language.toUpperCase()}</span>
+                  </span>
+                </td>
+                <td style={{ padding: "12px 16px" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.hxCurrency ? T.green : T.red, display: "inline-block" }} />
+                    <span style={{ color: c.hxCurrency ? T.black : T.red, fontWeight: c.hxCurrency ? 400 : 600 }}>{c.currency}</span>
+                  </span>
+                </td>
+                <td style={{ padding: "12px 16px" }}>
+                  {c.gaps.length > 0
+                    ? <span title={c.gaps.join(", ")} style={{ fontSize: 11, background: T.redBg, color: T.red, borderRadius: 4, padding: "2px 8px", fontWeight: 700, cursor: "help" }}>{c.gaps.length} gap{c.gaps.length > 1 ? "s" : ""}</span>
+                    : <span style={{ fontSize: 11, background: T.greenBg, color: T.green, borderRadius: 4, padding: "2px 8px", fontWeight: 700 }}>✓ Clean</span>}
+                </td>
+                <td style={{ padding: "12px 16px" }}>
+                  {editId === c.id
+                    ? <button onClick={() => { setCountries(cs => cs.map(x => x.id === c.id ? { ...x, annualPax: Number(editVal.annualPax) } : x)); setEditId(null); }}
+                        style={{ background: T.green, color: T.white, border: "none", borderRadius: 6, padding: "5px 12px", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Save</button>
+                    : <button onClick={() => { setEditId(c.id); setEditVal({ annualPax: c.annualPax }); }}
+                        style={{ background: T.purple, color: T.white, border: "none", borderRadius: 6, padding: "5px 12px", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Edit</button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function PartnerForm({ value, onChange, onSubmit, onCancel, submitLabel }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Partner Name</label>
+        <input value={value.name} onChange={e => onChange(x => ({ ...x, name: e.target.value }))}
+          placeholder={submitLabel === "Add Partner" ? "e.g. Ryanair" : undefined}
+          style={{ width: "100%", border: `1px solid ${T.grey2}`, borderRadius: 6, padding: "6px 10px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }} />
+      </div>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Channel</label>
+        <select value={value.channel} onChange={e => onChange(x => ({ ...x, channel: e.target.value }))}
+          style={{ width: "100%", border: `1px solid ${T.grey2}`, borderRadius: 6, padding: "6px 10px", fontFamily: "inherit", fontSize: 13 }}>
+          <option>{CHANNEL.API}</option>
+          <option>{CHANNEL.WHITE_LABEL}</option>
+          <option>{CHANNEL.BOTH}</option>
+        </select>
+      </div>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Status</label>
+        <select value={value.committed ? "committed" : "prospect"} onChange={e => onChange(x => ({ ...x, committed: e.target.value === "committed" }))}
+          style={{ width: "100%", border: `1px solid ${T.grey2}`, borderRadius: 6, padding: "6px 10px", fontFamily: "inherit", fontSize: 13 }}>
+          <option value="committed">Committed</option>
+          <option value="prospect">Prospect</option>
+        </select>
+      </div>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Countries</label>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {INITIAL_COUNTRIES.map(c => (
+            <button key={c.id} onClick={() => onChange(x => ({ ...x, countries: toggleInArray(x.countries, c.id) }))}
+              style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${value.countries.includes(c.id) ? T.purple : T.grey2}`, background: value.countries.includes(c.id) ? T.purpleTint : T.white, color: value.countries.includes(c.id) ? T.purple : T.greyText, cursor: "pointer", fontWeight: 700 }}>
+              {c.id}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Products</label>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {PRODUCTS.map(pr => (
+            <button key={pr} onClick={() => onChange(x => ({ ...x, products: toggleInArray(x.products, pr) }))}
+              style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${value.products.includes(pr) ? T.green : T.grey2}`, background: value.products.includes(pr) ? T.greenBg : T.white, color: value.products.includes(pr) ? T.green : T.greyText, cursor: "pointer", fontWeight: 600 }}>
+              {pr}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Notes</label>
+        <input value={value.notes} onChange={e => onChange(x => ({ ...x, notes: e.target.value }))}
+          style={{ width: "100%", border: `1px solid ${T.grey2}`, borderRadius: 6, padding: "6px 10px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }} />
+      </div>
+      <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8 }}>
+        <button onClick={onSubmit} style={{ background: T.green, color: T.white, border: "none", borderRadius: 6, padding: "7px 16px", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{submitLabel}</button>
+        <button onClick={onCancel} style={{ background: T.grey3, color: T.greyText, border: "none", borderRadius: 6, padding: "7px 16px", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function PartnersView({ forecast, setPartners }) {
+  const [editId, setEditId] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newPartner, setNewPartner] = useState(EMPTY_PARTNER);
+
+  const startEdit  = (p) => { setEditId(p.id); setDraft({ ...p }); };
+  const saveEdit   = () => { setPartners(ps => ps.map(p => p.id === editId ? draft : p)); setEditId(null); setDraft(null); };
+  const cancelEdit = () => { setEditId(null); setDraft(null); };
+  const deletePartner = (id) => setPartners(ps => ps.filter(p => p.id !== id));
+  const saveNew = () => {
+    if (!newPartner.name.trim()) return;
+    setPartners(ps => [...ps, { ...newPartner, id: `p${Date.now()}` }]);
+    setNewPartner(EMPTY_PARTNER);
+    setShowAdd(false);
+  };
+
+  const sortedPartners = useMemo(
+    () => [...forecast.byPartner].sort((a, b) => b.totalGP - a.totalGP),
+    [forecast.byPartner]
+  );
+
+  return (
+    <div>
+      <SectionHeader title="Partner Forecast" sub="Partners ranked by forecast GP contribution" />
+      <div style={{ display: "grid", gap: 12, marginBottom: 20 }}>
+        {sortedPartners.map(p => (
+          <div key={p.id} style={{ background: T.white, borderRadius: 12, border: `1px solid ${editId === p.id ? T.purple : T.grey2}`, padding: 20 }}>
+            {editId === p.id ? (
+              <PartnerForm value={draft} onChange={setDraft} onSubmit={saveEdit} onCancel={cancelEdit} submitLabel="Save" />
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "200px 120px 120px 1fr 1fr auto auto", gap: 16, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 15 }}>{p.name}</div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+                    <ChannelBadge channel={p.channel} />
+                    {p.committed
+                      ? <span style={{ fontSize: 10, fontWeight: 700, background: T.greenBg, color: T.green, borderRadius: 4, padding: "2px 6px" }}>✓ Committed</span>
+                      : <span style={{ fontSize: 10, fontWeight: 700, background: T.orangeBg, color: T.orange, borderRadius: 4, padding: "2px 6px" }}>~ Prospect</span>}
+                  </div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontWeight: 800, fontSize: 20, color: T.purple }}>{fmtGP(p.totalGP)}</div>
+                  <div style={{ fontSize: 11, color: T.greyText }}>Forecast GP</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{fmtNum(p.totalBookings)}</div>
+                  <div style={{ fontSize: 11, color: T.greyText }}>Bookings</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: T.greyText, marginBottom: 4 }}>Countries</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {p.countries.map(c => <span key={c} style={{ fontSize: 11, background: T.purpleTint, color: T.purple, borderRadius: 4, padding: "2px 6px", fontWeight: 700 }}>{c}</span>)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: T.greyText, marginBottom: 4 }}>Products</div>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {p.products.map(prod => <span key={prod} style={{ fontSize: 11, background: T.grey3, color: T.greyText, borderRadius: 4, padding: "2px 6px" }}>{prod}</span>)}
+                  </div>
+                </div>
+                <div style={{ fontSize: 11, color: T.greyText, maxWidth: 160 }}>{p.notes}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <button onClick={() => startEdit(p)} style={{ background: T.purple, color: T.white, border: "none", borderRadius: 6, padding: "5px 12px", fontFamily: "inherit", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>Edit</button>
+                  <button onClick={() => deletePartner(p.id)} style={{ background: T.redBg, color: T.red, border: `1px solid ${T.red}40`, borderRadius: 6, padding: "5px 12px", fontFamily: "inherit", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>Remove</button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        {showAdd ? (
+          <div style={{ background: T.white, borderRadius: 12, border: `2px dashed ${T.purple}`, padding: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16, color: T.purple }}>New Partner</div>
+            <PartnerForm value={newPartner} onChange={setNewPartner} onSubmit={saveNew} onCancel={() => { setShowAdd(false); setNewPartner(EMPTY_PARTNER); }} submitLabel="Add Partner" />
+          </div>
+        ) : (
+          <button onClick={() => setShowAdd(true)} style={{ background: T.white, border: `2px dashed ${T.grey2}`, borderRadius: 12, padding: 20, fontFamily: "inherit", fontWeight: 700, fontSize: 13, color: T.greyText, cursor: "pointer", textAlign: "center", width: "100%" }}>
+            + Add Partner
+          </button>
+        )}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div style={{ background: T.blueBg, borderRadius: 12, padding: 20, border: `1px solid ${T.blue}40` }}>
+          <div style={{ fontWeight: 700, color: T.blue, fontSize: 14, marginBottom: 8 }}>🔌 API Opportunity</div>
+          <div style={{ fontWeight: 800, fontSize: 28 }}>{fmtGP(forecast.apiOpp)}</div>
+          <div style={{ fontSize: 12, color: T.greyText }}>{forecast.byPartner.filter(p => p.isAPI).length} API partners</div>
+        </div>
+        <div style={{ background: T.purpleTint, borderRadius: 12, padding: 20, border: `1px solid ${T.purple}40` }}>
+          <div style={{ fontWeight: 700, color: T.purple, fontSize: 14, marginBottom: 8 }}>🏷️ White Label Opportunity</div>
+          <div style={{ fontWeight: 800, fontSize: 28 }}>{fmtGP(forecast.wlOpp)}</div>
+          <div style={{ fontSize: 12, color: T.greyText }}>{forecast.byPartner.filter(p => p.isWL).length} WL partners</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AvailabilityMatrix({ countries, availability, setAvailability }) {
+  const cycle = (cid, p) => {
+    const order = ["live", "planned", "not available", "unknown"];
+    const cur = availability[cid]?.[p] ?? "unknown";
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    setAvailability(prev => ({ ...prev, [cid]: { ...(prev[cid] || {}), [p]: next } }));
+  };
+  return (
+    <div>
+      <SectionHeader title="Product Availability Matrix" sub="Click any cell to cycle: Live → Planned → Not Available → Unknown" />
+      <div style={{ background: T.white, borderRadius: 12, border: `1px solid ${T.grey2}`, overflow: "auto" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%" }}>
+          <thead>
+            <tr>
+              <th style={{ padding: "12px 16px", background: T.purple, color: T.white, textAlign: "left", fontSize: 12, fontWeight: 700, position: "sticky", left: 0, zIndex: 1 }}>Country</th>
+              {PRODUCTS.map(p => <th key={p} style={{ padding: "12px 16px", background: T.purple, color: T.white, fontSize: 11, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap" }}>{p}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {countries.map((c, i) => (
+              <tr key={c.id} style={{ background: i % 2 === 0 ? T.white : T.grey4 }}>
+                <td style={{ padding: "10px 16px", fontWeight: 700, fontSize: 13, borderRight: `1px solid ${T.grey2}`, position: "sticky", left: 0, background: i % 2 === 0 ? T.white : T.grey4 }}>{c.name}</td>
+                {PRODUCTS.map(p => {
+                  const status = availability[c.id]?.[p] ?? "unknown";
+                  const cfg = STATUS_CFG[status];
+                  return (
+                    <td key={p} style={{ padding: "8px 12px", textAlign: "center", cursor: "pointer" }} onClick={() => cycle(c.id, p)}>
+                      <span style={{ background: cfg.bg, color: cfg.color, borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 700, display: "inline-block", minWidth: 90 }}>
+                        <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: cfg.color, marginRight: 4, verticalAlign: "middle" }} />
+                        {cfg.label}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+        {Object.entries(STATUS_CFG).map(([k, cfg]) => (
+          <div key={k} style={{ display: "flex", alignItems: "center", gap: 6, background: T.white, borderRadius: 8, padding: "5px 12px", border: `1px solid ${T.grey2}`, fontSize: 12, fontWeight: 600 }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: cfg.color, display: "inline-block" }} /> {cfg.label}
+          </div>
+        ))}
+        <div style={{ fontSize: 12, color: T.greyText, alignSelf: "center" }}>← Click any cell to change</div>
+      </div>
+    </div>
+  );
+}
+
+function RateSliders({ rates, setRates, accentColor }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+      {PRODUCTS.map(p => (
+        <div key={p}>
+          <label style={ASSUMPTION_LABEL_STYLE}>{p}</label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="range" min={0.001} max={0.15} step={0.001} value={rates[p] || 0} onChange={e => setRates(prev => ({ ...prev, [p]: Number(e.target.value) }))} style={{ flex: 1, accentColor }} />
+            <span style={{ fontWeight: 700, color: accentColor, minWidth: 44, textAlign: "right" }}>{((rates[p] || 0) * 100).toFixed(1)}%</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function OverrideSlider({ label, globalValue, override, onSet, onReset, min, max, step, formatVal, accentColor }) {
+  const hasOverride = override !== undefined;
+  const value = hasOverride ? override : globalValue;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+        <label style={{ ...ASSUMPTION_LABEL_STYLE, marginBottom: 0 }}>{label}</label>
+        {hasOverride
+          ? <button onClick={onReset} style={{ fontSize: 10, color: T.red, background: "none", border: "none", cursor: "pointer", padding: 0, fontFamily: "inherit", fontWeight: 700 }}>↺ reset</button>
+          : <span style={{ fontSize: 10, color: T.grey1, fontWeight: 600 }}>global</span>}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+        <input type="range" min={min} max={max} step={step} value={value}
+          onChange={e => onSet(Number(e.target.value))}
+          style={{ flex: 1, accentColor: hasOverride ? accentColor : T.grey1 }} />
+        <span style={{ fontWeight: 700, color: hasOverride ? accentColor : T.greyText, minWidth: 48, textAlign: "right" }}>{formatVal(value)}</span>
+      </div>
+    </div>
+  );
+}
+
+function CountryAssumptionsPanel({ countries, gpPerBooking, gpOverrides, setGpOverrides, apiAttachRates, apiRateOverrides, setApiRateOverrides, wlConversionRates, wlRateOverrides, setWlRateOverrides }) {
+  const [selectedCid, setSelectedCid] = useState(countries[0]?.id ?? "");
+  const country = countries.find(c => c.id === selectedCid);
+
+  const setOverride = (setter, p, val) =>
+    setter(prev => ({ ...prev, [selectedCid]: { ...(prev[selectedCid] || {}), [p]: val } }));
+
+  const resetOverride = (setter, p) =>
+    setter(prev => {
+      const co = { ...(prev[selectedCid] || {}) };
+      delete co[p];
+      const next = { ...prev };
+      if (Object.keys(co).length === 0) delete next[selectedCid];
+      else next[selectedCid] = co;
+      return next;
+    });
+
+  const overrideCount = (cid) =>
+    Object.keys(gpOverrides[cid] || {}).length +
+    Object.keys(apiRateOverrides[cid] || {}).length +
+    Object.keys(wlRateOverrides[cid] || {}).length;
+
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 20 }}>
+        {countries.map(c => {
+          const active = c.id === selectedCid;
+          const n = overrideCount(c.id);
+          return (
+            <button key={c.id} onClick={() => setSelectedCid(c.id)} style={{
+              padding: "5px 10px", borderRadius: 6,
+              border: `1px solid ${active ? T.purple : T.grey2}`,
+              background: active ? T.purpleTint : T.white,
+              color: active ? T.purple : T.greyText,
+              fontFamily: "inherit", fontWeight: active ? 700 : 600, fontSize: 12, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 5,
+            }}>
+              {c.name}
+              {n > 0 && <span style={{ background: T.orange, color: T.white, borderRadius: 10, fontSize: 9, fontWeight: 700, padding: "1px 5px" }}>{n}</span>}
+            </button>
+          );
+        })}
+      </div>
+      {country && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.grey2}` }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>GP Per Booking — {country.name}</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>Override global GP values for this market. Orange = market-specific value active.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              {PRODUCTS.map(p => (
+                <OverrideSlider key={p} label={p}
+                  globalValue={gpPerBooking[p] || 0} override={gpOverrides[selectedCid]?.[p]}
+                  onSet={val => setOverride(setGpOverrides, p, val)} onReset={() => resetOverride(setGpOverrides, p)}
+                  min={1} max={50} step={0.5} formatVal={v => `£${v.toFixed(2)}`} accentColor={T.orange} />
+              ))}
+            </div>
+          </div>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.blue}40` }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: T.blue }}>🔌 API Attach Rates — {country.name}</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>Market-specific overrides for API attach rates. Blue = override active.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              {PRODUCTS.map(p => (
+                <OverrideSlider key={p} label={p}
+                  globalValue={apiAttachRates[p] || 0} override={apiRateOverrides[selectedCid]?.[p]}
+                  onSet={val => setOverride(setApiRateOverrides, p, val)} onReset={() => resetOverride(setApiRateOverrides, p)}
+                  min={0.001} max={0.15} step={0.001} formatVal={v => `${(v * 100).toFixed(1)}%`} accentColor={T.blue} />
+              ))}
+            </div>
+          </div>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.purple}40` }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, color: T.purple }}>🏷️ WL Conversion Rates — {country.name}</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>Market-specific overrides for white label conversion rates. Purple = override active.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              {PRODUCTS.map(p => (
+                <OverrideSlider key={p} label={p}
+                  globalValue={wlConversionRates[p] || 0} override={wlRateOverrides[selectedCid]?.[p]}
+                  onSet={val => setOverride(setWlRateOverrides, p, val)} onReset={() => resetOverride(setWlRateOverrides, p)}
+                  min={0.001} max={0.15} step={0.001} formatVal={v => `${(v * 100).toFixed(1)}%`} accentColor={T.purple} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AssumptionsPanel({ gpPerBooking, setGpPerBooking, apiAttachRates, setApiAttachRates, wlConversionRates, setWlConversionRates, paxDivisor, setPaxDivisor, countries, setCountries, gpOverrides, setGpOverrides, apiRateOverrides, setApiRateOverrides, wlRateOverrides, setWlRateOverrides }) {
+  const [view, setView] = useState("global");
+  return (
+    <div>
+      <SectionHeader title="Forecast Assumptions" sub="Adjust any value — forecast updates instantly across all views" />
+      <div style={{ display: "inline-flex", gap: 0, marginBottom: 20, border: `1px solid ${T.grey2}`, borderRadius: 8, overflow: "hidden" }}>
+        {[["global", "Global Defaults"], ["by-country", "By Country / Market"]].map(([v, label]) => (
+          <button key={v} onClick={() => setView(v)} style={{
+            background: view === v ? T.purple : T.white, color: view === v ? T.white : T.greyText,
+            border: "none", padding: "8px 20px", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer",
+          }}>{label}</button>
+        ))}
+      </div>
+
+      {view === "global" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.grey2}` }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Global Settings</div>
+            <label style={ASSUMPTION_LABEL_STYLE}>Pax-to-Booking Divisor</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <input type="range" min={1.5} max={5} step={0.1} value={paxDivisor} onChange={e => setPaxDivisor(Number(e.target.value))} style={{ flex: 1, accentColor: T.purple }} />
+              <span style={{ fontWeight: 700, color: T.purple, minWidth: 36 }}>{paxDivisor.toFixed(1)}</span>
+            </div>
+            <div style={{ fontSize: 11, color: T.greyText, marginTop: 4 }}>1 booking per {paxDivisor.toFixed(1)} passengers</div>
+          </div>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.grey2}` }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>GP Per Booking — Global (£)</div>
+            {PRODUCTS.map(p => (
+              <div key={p} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, width: 140, flexShrink: 0 }}>{p}</label>
+                <input type="range" min={1} max={50} step={0.5} value={gpPerBooking[p] || 0} onChange={e => setGpPerBooking(prev => ({ ...prev, [p]: Number(e.target.value) }))} style={{ flex: 1, accentColor: T.purple }} />
+                <span style={{ fontWeight: 700, color: T.purple, minWidth: 44, textAlign: "right" }}>£{(gpPerBooking[p] || 0).toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.blue}`, gridColumn: "1 / -1" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>🔌 API Attach Rates by Product — Global</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>% of bookings via partner API where the customer adds each product</div>
+            <RateSliders rates={apiAttachRates} setRates={setApiAttachRates} accentColor={T.blue} />
+          </div>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.purple}`, gridColumn: "1 / -1" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>🏷️ White Label Conversion Rates by Product — Global</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>% of customers who visit the white label page and complete a purchase</div>
+            <RateSliders rates={wlConversionRates} setRates={setWlConversionRates} accentColor={T.purple} />
+          </div>
+        </div>
+      )}
+
+      {view === "by-country" && (
+        <CountryAssumptionsPanel
+          countries={countries}
+          gpPerBooking={gpPerBooking} gpOverrides={gpOverrides} setGpOverrides={setGpOverrides}
+          apiAttachRates={apiAttachRates} apiRateOverrides={apiRateOverrides} setApiRateOverrides={setApiRateOverrides}
+          wlConversionRates={wlConversionRates} wlRateOverrides={wlRateOverrides} setWlRateOverrides={setWlRateOverrides}
+        />
+      )}
+    </div>
+  );
+}
+
+function ScenarioComparison({ countries, availability, gpPerBooking, apiAttachRates, wlConversionRates, paxDivisor, gpOverrides, apiRateOverrides, wlRateOverrides }) {
+  const { scenarios, countryChartData } = useMemo(() => {
+    const getGP      = (cid, p) => gpOverrides[cid]?.[p]      ?? gpPerBooking[p]      ?? 0;
+    const getApiRate = (cid, p) => apiRateOverrides[cid]?.[p] ?? apiAttachRates[p]    ?? 0;
+    const getWlRate  = (cid, p) => wlRateOverrides[cid]?.[p]  ?? wlConversionRates[p] ?? 0;
+    const blendedRate = (cid, p) => (getApiRate(cid, p) + getWlRate(cid, p)) / 2;
+    const calc = (mult) => {
+      let gp = 0, bk = 0;
+      countries.forEach(c => {
+        PRODUCTS.forEach(p => {
+          if (isActive(availability[c.id]?.[p] ?? "unknown")) {
+            const b = (c.annualPax / paxDivisor) * blendedRate(c.id, p) * mult;
+            gp += b * getGP(c.id, p); bk += b;
+          }
+        });
+      });
+      return { gp, bk };
+    };
+    const scenarios = {
+      conservative: { ...calc(0.6), color: T.orange, desc: "60% of base rates. Slow rollouts, low conversion." },
+      base:         { ...calc(1.0), color: T.blue,   desc: "Standard rates. Normal market penetration assumed." },
+      stretch:      { ...calc(1.4), color: T.green,  desc: "140% of base rates. All partners committed, fast rollout." },
+    };
+    const countryChartData = countries.map(c => {
+      const gpForMult = (mult) => PRODUCTS.reduce((sum, p) =>
+        isActive(availability[c.id]?.[p] ?? "unknown")
+          ? sum + (c.annualPax / paxDivisor) * blendedRate(c.id, p) * mult * getGP(c.id, p)
+          : sum, 0);
+      return { name: c.name, Conservative: Math.round(gpForMult(0.6)/1000), Base: Math.round(gpForMult(1.0)/1000), Stretch: Math.round(gpForMult(1.4)/1000) };
+    });
+    return { scenarios, countryChartData };
+  }, [countries, availability, gpPerBooking, apiAttachRates, wlConversionRates, paxDivisor, gpOverrides, apiRateOverrides, wlRateOverrides]);
+
+  const chartData = Object.entries(scenarios).map(([name, s]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), GP: Math.round(s.gp / 1000) }));
+
+  return (
+    <div>
+      <SectionHeader title="Scenario Comparison" sub="Conservative, base and stretch forecasts side by side" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+        {Object.entries(scenarios).map(([name, s]) => (
+          <div key={name} style={{ background: T.white, borderRadius: 12, padding: 24, border: `2px solid ${s.color}`, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: s.color }} />
+            <div style={{ fontWeight: 800, fontSize: 15, textTransform: "capitalize", color: s.color, marginBottom: 4 }}>{name}</div>
+            <div style={{ fontSize: 11, color: T.greyText, marginBottom: 16, lineHeight: 1.4 }}>{s.desc}</div>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, color: T.greyText, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Annual GP</div>
+              <div style={{ fontSize: 32, fontWeight: 800 }}>{fmtGP(s.gp)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: T.greyText, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>Annual Bookings</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: T.greyText }}>{fmtNum(s.bk)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.grey2}`, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>GP Comparison (£K)</div>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={chartData}>
+            <XAxis dataKey="name" tick={{ fontSize: 13, fontWeight: 700 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip formatter={v => [`£${v}K`, "GP"]} contentStyle={{ borderRadius: 8 }} />
+            <Bar dataKey="GP" radius={[6, 6, 0, 0]}>
+              {chartData.map((_, i) => <Cell key={i} fill={[T.orange, T.blue, T.green][i]} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.grey2}` }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>GP by Country — All Scenarios (£K)</div>
+        <ResponsiveContainer width="100%" height={260}>
+          <BarChart data={countryChartData}>
+            <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip contentStyle={{ borderRadius: 8 }} formatter={v => [`£${v}K`]} />
+            <Legend />
+            <Bar dataKey="Conservative" fill={T.orange} radius={[3, 3, 0, 0]} />
+            <Bar dataKey="Base" fill={T.blue} radius={[3, 3, 0, 0]} />
+            <Bar dataKey="Stretch" fill={T.green} radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [countries, setCountries] = useState(INITIAL_COUNTRIES);
+  const [availability, setAvailability] = useState(INITIAL_AVAILABILITY);
+  const [partners, setPartners] = useState(INITIAL_PARTNERS);
+  const [gpPerBooking, setGpPerBooking] = useState(GP_DEFAULTS);
+  const [apiAttachRates, setApiAttachRates] = useState(API_AR_DEFAULTS);
+  const [wlConversionRates, setWlConversionRates] = useState(WL_CR_DEFAULTS);
+  const [gpOverrides, setGpOverrides] = useState({});
+  const [apiRateOverrides, setApiRateOverrides] = useState({});
+  const [wlRateOverrides, setWlRateOverrides] = useState({});
+  const [paxDivisor, setPaxDivisor] = useState(2.4);
+  const [scenario, setScenario] = useState("base");
+
+  const forecast = useMemo(() => {
+    const mult = SCENARIO_MULT[scenario];
+    const countryById = new Map(countries.map(c => [c.id, c]));
+    const getGP      = (cid, p) => gpOverrides[cid]?.[p]       ?? gpPerBooking[p]      ?? 0;
+    const getApiRate = (cid, p) => apiRateOverrides[cid]?.[p]  ?? apiAttachRates[p]    ?? 0;
+    const getWlRate  = (cid, p) => wlRateOverrides[cid]?.[p]   ?? wlConversionRates[p] ?? 0;
+    const blendedRate = (cid, p) => (getApiRate(cid, p) + getWlRate(cid, p)) / 2;
+
+    const byCountry = countries.map(c => {
+      const bookings = c.annualPax / paxDivisor;
+      let totalBookings = 0, totalGP = 0;
+      const gaps = [];
+      if (!c.hxLang) gaps.push("Language not supported");
+      if (!c.hxCurrency) gaps.push("Currency not supported");
+      PRODUCTS.forEach(p => {
+        const status = availability[c.id]?.[p] ?? "unknown";
+        if (isActive(status)) {
+          const bk = bookings * blendedRate(c.id, p) * mult;
+          totalBookings += bk; totalGP += bk * getGP(c.id, p);
+        } else if (status === "not available") {
+          gaps.push(`${p} unavailable`);
+        }
+      });
+      return { ...c, estBookings: bookings, totalBookings, totalGP, gaps };
+    });
+
+    const byPartner = partners.map(pt => {
+      let totalBookings = 0, totalGP = 0;
+      pt.countries.forEach(cid => {
+        const c = countryById.get(cid); if (!c) return;
+        pt.products.forEach(p => {
+          if (!isActive(availability[cid]?.[p] ?? "unknown")) return;
+          const basePax = (c.annualPax / paxDivisor) * PARTNER_CHANNEL_SHARE * mult;
+          if (pt.channel === CHANNEL.API || pt.channel === CHANNEL.BOTH) {
+            const bk = basePax * getApiRate(cid, p);
+            totalBookings += bk; totalGP += bk * getGP(cid, p);
+          }
+          if (pt.channel === CHANNEL.WHITE_LABEL || pt.channel === CHANNEL.BOTH) {
+            const bk = basePax * getWlRate(cid, p);
+            totalBookings += bk; totalGP += bk * getGP(cid, p);
+          }
+        });
+      });
+      return {
+        ...pt, totalBookings, totalGP,
+        isAPI: pt.channel === CHANNEL.API || pt.channel === CHANNEL.BOTH,
+        isWL:  pt.channel === CHANNEL.WHITE_LABEL || pt.channel === CHANNEL.BOTH,
+      };
+    });
+
+    const byProduct = PRODUCTS.map(p => {
+      let bk = 0, gp = 0;
+      countries.forEach(c => {
+        if (isActive(availability[c.id]?.[p] ?? "unknown")) {
+          const b = (c.annualPax / paxDivisor) * blendedRate(c.id, p) * mult;
+          bk += b; gp += b * getGP(c.id, p);
+        }
+      });
+      return { product: p, bookings: bk, gp };
+    });
+
+    return {
+      byCountry, byPartner, byProduct,
+      totalGP:       byCountry.reduce((s, c) => s + c.totalGP, 0),
+      totalBookings: byCountry.reduce((s, c) => s + c.totalBookings, 0),
+      apiOpp: byPartner.filter(p => p.isAPI).reduce((s, p) => s + p.totalGP, 0),
+      wlOpp:  byPartner.filter(p => p.isWL).reduce((s, p) => s + p.totalGP, 0),
+    };
+  }, [countries, availability, partners, gpPerBooking, apiAttachRates, wlConversionRates, gpOverrides, apiRateOverrides, wlRateOverrides, paxDivisor, scenario]);
+
+  const exportCSV = useCallback(() => {
+    const rows = [["Country","Region","Annual Pax","Est Bookings","Forecast Bookings","Forecast GP","Gaps"].join(",")];
+    forecast.byCountry.forEach(c => rows.push([c.name, c.region, c.annualPax, Math.round(c.estBookings), Math.round(c.totalBookings), Math.round(c.totalGP), `"${c.gaps.join("; ")}"`].join(",")));
+    const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "hx-forecast.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }, [forecast.byCountry]);
+
+  const tabs = [
+    { id: "dashboard",   label: "Dashboard",    icon: "📊" },
+    { id: "countries",   label: "Countries",    icon: "🌍" },
+    { id: "partners",    label: "Partners",     icon: "🤝" },
+    { id: "matrix",      label: "Availability", icon: "📋" },
+    { id: "assumptions", label: "Assumptions",  icon: "⚙️" },
+    { id: "scenarios",   label: "Scenarios",    icon: "🎯" },
+  ];
+
+  return (
+    <div style={{ fontFamily: "'Nunito', sans-serif", background: T.offWhite, minHeight: "100vh", color: T.black }}>
+      <nav style={{ background: T.purple, color: T.white, padding: "0 24px", display: "flex", alignItems: "center", gap: 0, boxShadow: "0 2px 12px rgba(84,46,145,0.3)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "16px 24px 16px 0", borderRight: `1px solid rgba(255,255,255,0.15)`, marginRight: 24 }}>
+          <div style={{ background: T.yellow, borderRadius: 8, padding: "4px 10px", fontWeight: 800, color: T.black, fontSize: 15 }}>HX</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.2 }}>B2B Partner Opportunities</div>
+            <div style={{ fontSize: 11, opacity: 0.7, fontWeight: 600, lineHeight: 1.2 }}>Forecast Model</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 0, flex: 1 }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+              background: activeTab === t.id ? "rgba(253,220,6,0.15)" : "transparent",
+              color: activeTab === t.id ? T.yellow : "rgba(255,255,255,0.75)",
+              border: "none", borderBottom: activeTab === t.id ? `2px solid ${T.yellow}` : "2px solid transparent",
+              padding: "18px 16px", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, fontSize: 13,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>{t.icon} {t.label}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <ScenarioPill scenario={scenario} setScenario={setScenario} />
+          <button onClick={exportCSV} style={{ background: T.yellow, color: T.black, border: "none", borderRadius: 8, padding: "8px 16px", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>↓ CSV</button>
+        </div>
+      </nav>
+      <main style={{ padding: 24, maxWidth: 1400, margin: "0 auto" }}>
+        {activeTab === "dashboard"   && <Dashboard forecast={forecast} scenario={scenario} />}
+        {activeTab === "countries"   && <CountriesView forecast={forecast} setCountries={setCountries} />}
+        {activeTab === "partners"    && <PartnersView forecast={forecast} setPartners={setPartners} />}
+        {activeTab === "matrix"      && <AvailabilityMatrix countries={countries} availability={availability} setAvailability={setAvailability} />}
+        {activeTab === "assumptions" && <AssumptionsPanel
+            gpPerBooking={gpPerBooking} setGpPerBooking={setGpPerBooking}
+            apiAttachRates={apiAttachRates} setApiAttachRates={setApiAttachRates}
+            wlConversionRates={wlConversionRates} setWlConversionRates={setWlConversionRates}
+            paxDivisor={paxDivisor} setPaxDivisor={setPaxDivisor}
+            countries={countries} setCountries={setCountries}
+            gpOverrides={gpOverrides} setGpOverrides={setGpOverrides}
+            apiRateOverrides={apiRateOverrides} setApiRateOverrides={setApiRateOverrides}
+            wlRateOverrides={wlRateOverrides} setWlRateOverrides={setWlRateOverrides}
+          />}
+        {activeTab === "scenarios"   && <ScenarioComparison
+            countries={countries} availability={availability}
+            gpPerBooking={gpPerBooking} apiAttachRates={apiAttachRates} wlConversionRates={wlConversionRates}
+            paxDivisor={paxDivisor}
+            gpOverrides={gpOverrides} apiRateOverrides={apiRateOverrides} wlRateOverrides={wlRateOverrides}
+          />}
+      </main>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+  </script>
+</body>
+</html>
