@@ -10,12 +10,12 @@
   <script src="https://unpkg.com/prop-types/prop-types.min.js" crossorigin></script>
   <!-- Recharts must load before Babel: Babel's module/exports globals trick the Recharts UMD into CommonJS mode -->
   <script src="https://cdn.jsdelivr.net/npm/recharts@2.13.3/umd/Recharts.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.5/babel.min.js"></script>
   <style>* { box-sizing: border-box; margin: 0; padding: 0; }</style>
 </head>
 <body>
   <div id="root"></div>
-  <script type="text/babel">
+  <script type="text/babel" data-presets="react">
 const { useState, useMemo, useCallback } = React;
 const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } = Recharts;
 
