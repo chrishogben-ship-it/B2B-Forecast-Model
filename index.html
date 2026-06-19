@@ -47,32 +47,62 @@ const INITIAL_COUNTRIES = [
   { id: "AT", name: "Austria", region: "DACH", annualPax: 22000000, language: "de", currency: "EUR", hxLang: true, hxCurrency: true },
 ];
 
-const PRODUCTS = ["On-Airport Parking", "Off-Airport Parking", "Hotels", "Lounges", "Fast Track", "Transfers", "Car Hire"];
+const PRODUCTS = ["Parking", "Hotels", "Lounges", "Fast Track", "Transfers", "Car Hire"];
 const CHANNEL = { API: "API", WHITE_LABEL: "White Label", BOTH: "Both" };
 
 const INITIAL_AVAILABILITY = {
-  GB: { "On-Airport Parking": "live",    "Off-Airport Parking": "live",    Hotels: "live",        Lounges: "live",          "Fast Track": "live",          Transfers: "live",    "Car Hire": "live"    },
-  IE: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "live",        Lounges: "planned",       "Fast Track": "not available", Transfers: "planned", "Car Hire": "unknown" },
-  DE: { "On-Airport Parking": "live",    "Off-Airport Parking": "live",     Hotels: "planned",     Lounges: "planned",       "Fast Track": "not available", Transfers: "live",    "Car Hire": "unknown" },
-  FR: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "live",        Lounges: "not available", "Fast Track": "not available", Transfers: "planned", "Car Hire": "unknown" },
-  NL: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "planned",     Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "unknown" },
-  BE: { "On-Airport Parking": "planned", "Off-Airport Parking": "planned",  Hotels: "not available", Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "not available" },
-  ES: { "On-Airport Parking": "live",    "Off-Airport Parking": "live",     Hotels: "live",        Lounges: "live",          "Fast Track": "live",          Transfers: "live",    "Car Hire": "live"    },
-  IT: { "On-Airport Parking": "planned", "Off-Airport Parking": "planned",  Hotels: "not available", Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "unknown" },
-  PL: { "On-Airport Parking": "planned", "Off-Airport Parking": "not available", Hotels: "not available", Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "not available" },
-  SE: { "On-Airport Parking": "unknown", "Off-Airport Parking": "unknown",  Hotels: "unknown",     Lounges: "unknown",       "Fast Track": "unknown",       Transfers: "unknown", "Car Hire": "unknown" },
-  CH: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "live",        Lounges: "planned",       "Fast Track": "not available", Transfers: "planned", "Car Hire": "unknown" },
-  AT: { "On-Airport Parking": "live",    "Off-Airport Parking": "planned",  Hotels: "live",        Lounges: "planned",       "Fast Track": "not available", Transfers: "not available", "Car Hire": "unknown" },
+  GB: { Parking: "live",    Hotels: "live",          Lounges: "live",          "Fast Track": "live",          Transfers: "live",    "Car Hire": "live"    },
+  IE: { Parking: "live",    Hotels: "live",          Lounges: "planned",       "Fast Track": "not available", Transfers: "planned", "Car Hire": "live"    },
+  DE: { Parking: "live",    Hotels: "planned",       Lounges: "planned",       "Fast Track": "not available", Transfers: "live",    "Car Hire": "live"    },
+  FR: { Parking: "live",    Hotels: "live",          Lounges: "not available", "Fast Track": "not available", Transfers: "planned", "Car Hire": "live"    },
+  NL: { Parking: "live",    Hotels: "planned",       Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "live" },
+  BE: { Parking: "planned", Hotels: "not available", Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "live" },
+  ES: { Parking: "live",    Hotels: "live",          Lounges: "live",          "Fast Track": "live",          Transfers: "live",    "Car Hire": "live"    },
+  IT: { Parking: "planned", Hotels: "not available", Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "live" },
+  PL: { Parking: "planned", Hotels: "not available", Lounges: "not available", "Fast Track": "not available", Transfers: "not available", "Car Hire": "live" },
+  SE: { Parking: "unknown", Hotels: "unknown",       Lounges: "unknown",       "Fast Track": "unknown",       Transfers: "unknown", "Car Hire": "live"    },
+  CH: { Parking: "live",    Hotels: "live",          Lounges: "planned",       "Fast Track": "not available", Transfers: "planned", "Car Hire": "live"    },
+  AT: { Parking: "live",    Hotels: "live",          Lounges: "planned",       "Fast Track": "not available", Transfers: "not available", "Car Hire": "live" },
 };
 
 const INITIAL_PARTNERS = [];
 
-const GP_DEFAULTS = { "On-Airport Parking": 14.00, "Off-Airport Parking": 10.00, Hotels: 18.00, Lounges: 8.00, "Fast Track": 5.50, Transfers: 15.00, "Car Hire": 22.00 };
-const API_AR_DEFAULTS = { "On-Airport Parking": 0.050, "Off-Airport Parking": 0.035, Hotels: 0.025, Lounges: 0.012, "Fast Track": 0.008, Transfers: 0.018, "Car Hire": 0.010 };
-const WL_CR_DEFAULTS  = { "On-Airport Parking": 0.032, "Off-Airport Parking": 0.025, Hotels: 0.018, Lounges: 0.008, "Fast Track": 0.005, Transfers: 0.012, "Car Hire": 0.007 };
+// Maps country IDs to BigQuery market groups (matches the SQL CASE output)
+const COUNTRY_TO_MARKET = {
+  GB: "UK",    IE: "IRELAND",
+  DE: "DACH",  AT: "DACH",   CH: "DACH",
+  FR: "FRANCE", NL: "BENE",  BE: "BENE",
+  ES: "SPAIN", IT: "ITALY",  PL: "POLAND/CZECH", SE: "NORDICS",
+};
+const MARKETS = ["UK", "IRELAND", "DACH", "FRANCE", "BENE", "SPAIN", "ITALY", "NORDICS", "POLAND/CZECH"];
+
+// Prices (abv_gbp) and GM% from BigQuery. Transfers & Car Hire are destination products — single global rate applies.
+// Hotels (AIR in BigQuery): IRELAND/SPAIN/ITALY/NORDICS/POLAND/CZECH have no market data — average of known markets used.
+const PRICE_DEFAULTS = {
+  Parking:      { UK: 93.78, IRELAND: 74.21, DACH: 86.12, FRANCE: 55.05, BENE: 67.76, SPAIN: 36.61, ITALY: 62.74, NORDICS: 84.32, "POLAND/CZECH": 69.20, default: 69.98 },
+  Hotels:       { UK: 126.15, IRELAND: 142.34, DACH: 112.76, FRANCE: 179.11, BENE: 151.33, SPAIN: 142.34, ITALY: 142.34, NORDICS: 142.34, "POLAND/CZECH": 142.34, default: 142.34 },
+  Lounges:      { UK: 100.52, IRELAND: 69.36, DACH: 77.63, FRANCE: 56.70, BENE: 63.86, SPAIN: 80.92, ITALY: 70.30, NORDICS: 57.57, "POLAND/CZECH": 66.23, default: 71.45 },
+  "Fast Track": { default: 15.63 },
+  // Destination products — same price regardless of departure market
+  Transfers:    { default: 87.85 },
+  "Car Hire":   { default: 226.84 },
+};
+const GM_DEFAULTS = {
+  Parking:      { UK: 0.2476, IRELAND: 0.4322, DACH: 0.4126, FRANCE: 0.4068, BENE: 0.4209, SPAIN: 0.3477, ITALY: 0.4109, NORDICS: 0.4043, "POLAND/CZECH": 0.4038, default: 0.3874 },
+  Hotels:       { UK: 0.1976, IRELAND: 0.3247, DACH: 0.4300, FRANCE: 0.2967, BENE: 0.3746, SPAIN: 0.3247, ITALY: 0.3247, NORDICS: 0.3247, "POLAND/CZECH": 0.3247, default: 0.3247 },
+  Lounges:      { UK: 0.2429, IRELAND: 0.2994, DACH: 0.3553, FRANCE: 0.3434, BENE: 0.3350, SPAIN: 0.3589, ITALY: 0.4242, NORDICS: 0.3762, "POLAND/CZECH": 0.3774, default: 0.3459 },
+  "Fast Track": { default: 0.1830 },
+  // Destination products — same GM% regardless of departure market
+  Transfers:    { default: 0.2311 },
+  "Car Hire":   { default: 0.0875 },
+};
+
+// API attach rate: % of partner pax who add each product via API
+const API_AR_DEFAULTS = { Parking: 0.042, Hotels: 0.025, Lounges: 0.012, "Fast Track": 0.008, Transfers: 0.018, "Car Hire": 0.010 };
+// White label conversion rate: % of WL visitors who complete a purchase per product
+const WL_CR_DEFAULTS  = { Parking: 0.028, Hotels: 0.018, Lounges: 0.008, "Fast Track": 0.005, Transfers: 0.012, "Car Hire": 0.007 };
 const SCENARIO_MULT = { conservative: 0.6, base: 1.0, stretch: 1.4 };
-const PARTNER_CHANNEL_SHARE = 0.3;
-const EMPTY_PARTNER = { id: "", name: "", channel: CHANNEL.API, countries: [], products: [], pax: 0, committed: false, notes: "" };
+const EMPTY_PARTNER = { id: "", name: "", channel: CHANNEL.API, countries: [], products: [], pax: 0, committed: false, notes: "", annualCosts: 0, crCost: { enabled: false, pencePerBooking: 17 }, commission: { type: "margin_share", value: 0 }, discount: { value: 0 } };
 
 const isActive = (status) => status === "live" || status === "planned";
 const toggleInArray = (arr, val) => arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val];
@@ -199,6 +229,41 @@ function Dashboard({ forecast, scenario }) {
           </ResponsiveContainer>
         </ChartCard>
       </div>
+      {forecast.byPartner.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <ChartCard title="GP by Partner × Product">
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: T.purpleTint }}>
+                    <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 700, color: T.purple, whiteSpace: "nowrap" }}>Partner</th>
+                    {PRODUCTS.map(prod => (
+                      <th key={prod} style={{ padding: "8px 12px", textAlign: "right", fontWeight: 700, color: T.purple, whiteSpace: "nowrap" }}>{prod}</th>
+                    ))}
+                    <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 800, color: T.purple, whiteSpace: "nowrap" }}>Net GP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...forecast.byPartner].sort((a, b) => b.totalGP - a.totalGP).map((p, i) => (
+                    <tr key={p.id} style={{ background: i % 2 === 0 ? T.white : T.grey4, borderBottom: `1px solid ${T.grey3}` }}>
+                      <td style={{ padding: "8px 12px", fontWeight: 700, whiteSpace: "nowrap" }}>
+                        {p.name}
+                        <div style={{ marginTop: 2 }}><ChannelBadge channel={p.channel} /></div>
+                      </td>
+                      {PRODUCTS.map(prod => (
+                        <td key={prod} style={{ padding: "8px 12px", textAlign: "right", color: (p.gpByProduct[prod] || 0) > 0 ? T.black : T.grey1 }}>
+                          {(p.gpByProduct[prod] || 0) > 0 ? fmtGP(p.gpByProduct[prod]) : "—"}
+                        </td>
+                      ))}
+                      <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 800, color: T.purple }}>{fmtGP(p.totalGP)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </ChartCard>
+        </div>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
         <ChartCard title="Top Partners by Forecast GP">
           {[...byPartner].sort((a, b) => b.totalGP - a.totalGP).slice(0, 5).map((p, i) => (
@@ -297,18 +362,17 @@ function CountriesView({ forecast, setCountries }) {
 }
 
 function PartnerForm({ value, onChange, onSubmit, onCancel, submitLabel }) {
+  const inp = (style) => ({ border: `1px solid ${T.grey2}`, borderRadius: 6, padding: "6px 10px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box", width: "100%", ...style });
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
       <div>
         <label style={ASSUMPTION_LABEL_STYLE}>Partner Name</label>
         <input value={value.name} onChange={e => onChange(x => ({ ...x, name: e.target.value }))}
-          placeholder={submitLabel === "Add Partner" ? "e.g. Ryanair" : undefined}
-          style={{ width: "100%", border: `1px solid ${T.grey2}`, borderRadius: 6, padding: "6px 10px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }} />
+          placeholder={submitLabel === "Add Partner" ? "e.g. Ryanair" : undefined} style={inp()} />
       </div>
       <div>
         <label style={ASSUMPTION_LABEL_STYLE}>Channel</label>
-        <select value={value.channel} onChange={e => onChange(x => ({ ...x, channel: e.target.value }))}
-          style={{ width: "100%", border: `1px solid ${T.grey2}`, borderRadius: 6, padding: "6px 10px", fontFamily: "inherit", fontSize: 13 }}>
+        <select value={value.channel} onChange={e => onChange(x => ({ ...x, channel: e.target.value }))} style={inp()}>
           <option>{CHANNEL.API}</option>
           <option>{CHANNEL.WHITE_LABEL}</option>
           <option>{CHANNEL.BOTH}</option>
@@ -316,11 +380,42 @@ function PartnerForm({ value, onChange, onSubmit, onCancel, submitLabel }) {
       </div>
       <div>
         <label style={ASSUMPTION_LABEL_STYLE}>Status</label>
-        <select value={value.committed ? "committed" : "prospect"} onChange={e => onChange(x => ({ ...x, committed: e.target.value === "committed" }))}
-          style={{ width: "100%", border: `1px solid ${T.grey2}`, borderRadius: 6, padding: "6px 10px", fontFamily: "inherit", fontSize: 13 }}>
+        <select value={value.committed ? "committed" : "prospect"} onChange={e => onChange(x => ({ ...x, committed: e.target.value === "committed" }))} style={inp()}>
           <option value="committed">Committed</option>
           <option value="prospect">Prospect</option>
         </select>
+      </div>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Annual Pax</label>
+        <input type="number" value={value.pax} onChange={e => onChange(x => ({ ...x, pax: Number(e.target.value) || 0 }))} style={inp()} />
+      </div>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Annual Costs (£)</label>
+        <input type="number" value={value.annualCosts || 0} onChange={e => onChange(x => ({ ...x, annualCosts: Number(e.target.value) || 0 }))}
+          placeholder="e.g. marketing fund" style={inp()} />
+      </div>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Commission Driver</label>
+        <div style={{ display: "flex", gap: 6 }}>
+          <select value={value.commission?.type || "margin_share"} onChange={e => onChange(x => ({ ...x, commission: { ...(x.commission || {}), type: e.target.value } }))}
+            style={{ ...inp(), flex: 2, padding: "6px 6px" }}>
+            <option value="margin_share">Margin Share %</option>
+            <option value="fixed_percent">Fixed % of Price</option>
+          </select>
+          <input type="number" min={0} max={100} step={0.5} value={value.commission?.value || 0}
+            onChange={e => onChange(x => ({ ...x, commission: { ...(x.commission || {}), value: Number(e.target.value) || 0 } }))}
+            style={{ ...inp(), width: 60 }} />
+          <span style={{ alignSelf: "center", fontSize: 12, color: T.greyText, flexShrink: 0 }}>%</span>
+        </div>
+      </div>
+      <div>
+        <label style={ASSUMPTION_LABEL_STYLE}>Price Discount</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input type="number" min={0} max={100} step={0.5} value={value.discount?.value || 0}
+            onChange={e => onChange(x => ({ ...x, discount: { value: Number(e.target.value) || 0 } }))}
+            style={{ ...inp(), width: 70 }} />
+          <span style={{ fontSize: 12, color: T.greyText, flexShrink: 0 }}>% off price</span>
+        </div>
       </div>
       <div>
         <label style={ASSUMPTION_LABEL_STYLE}>Countries</label>
@@ -346,8 +441,26 @@ function PartnerForm({ value, onChange, onSubmit, onCancel, submitLabel }) {
       </div>
       <div>
         <label style={ASSUMPTION_LABEL_STYLE}>Notes</label>
-        <input value={value.notes} onChange={e => onChange(x => ({ ...x, notes: e.target.value }))}
-          style={{ width: "100%", border: `1px solid ${T.grey2}`, borderRadius: 6, padding: "6px 10px", fontFamily: "inherit", fontSize: 13, boxSizing: "border-box" }} />
+        <input value={value.notes} onChange={e => onChange(x => ({ ...x, notes: e.target.value }))} style={inp()} />
+      </div>
+      <div style={{ gridColumn: "1 / -1" }}>
+        <label style={ASSUMPTION_LABEL_STYLE}>Customer Relations Cost</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontSize: 13, fontWeight: 600 }}>
+            <input type="checkbox" checked={value.crCost?.enabled || false}
+              onChange={e => onChange(x => ({ ...x, crCost: { ...(x.crCost || { pencePerBooking: 17 }), enabled: e.target.checked } }))}
+              style={{ width: 15, height: 15, accentColor: T.purple }} />
+            Apply CRC deduction
+          </label>
+          {value.crCost?.enabled && (
+            <>
+              <input type="number" min={0} step={1} value={value.crCost.pencePerBooking}
+                onChange={e => onChange(x => ({ ...x, crCost: { ...x.crCost, pencePerBooking: Number(e.target.value) || 0 } }))}
+                style={{ width: 64, border: `1px solid ${T.purple}`, borderRadius: 6, padding: "5px 8px", fontFamily: "inherit", fontSize: 13 }} />
+              <span style={{ fontSize: 13, color: T.greyText }}>p per booking</span>
+            </>
+          )}
+        </div>
       </div>
       <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8 }}>
         <button onClick={onSubmit} style={{ background: T.green, color: T.white, border: "none", borderRadius: 6, padding: "7px 16px", fontFamily: "inherit", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>{submitLabel}</button>
@@ -398,9 +511,24 @@ function PartnersView({ forecast, setPartners }) {
                       : <span style={{ fontSize: 10, fontWeight: 700, background: T.orangeBg, color: T.orange, borderRadius: 4, padding: "2px 6px" }}>~ Prospect</span>}
                   </div>
                 </div>
-                <div style={{ textAlign: "center" }}>
+                <div style={{ textAlign: "center", minWidth: 110 }}>
                   <div style={{ fontWeight: 800, fontSize: 20, color: T.purple }}>{fmtGP(p.totalGP)}</div>
-                  <div style={{ fontSize: 11, color: T.greyText }}>Forecast GP</div>
+                  <div style={{ fontSize: 11, color: T.greyText }}>Net GP</div>
+                  {(p.grossGP > p.totalGP + 0.01 || (p.discount?.value || 0) > 0) && (
+                    <div style={{ marginTop: 4, fontSize: 10, color: T.greyText, lineHeight: 1.6, textAlign: "left" }}>
+                      <div>
+                        Gross: {fmtGP(p.grossGP)}
+                        {(p.discount?.value || 0) > 0 && <span style={{ color: T.orange }}> (incl. {p.discount.value}% discount)</span>}
+                      </div>
+                      {(p.commission?.value || 0) > 0 && (
+                        <div style={{ color: T.red }}>
+                          − Commission ({p.commission.type === "margin_share" ? `${p.commission.value}% margin` : `${p.commission.value}% rev`})
+                        </div>
+                      )}
+                      {p.crCost?.enabled && <div style={{ color: T.red }}>− CRC ({p.crCost.pencePerBooking}p/bkg)</div>}
+                      {(p.annualCosts || 0) > 0 && <div style={{ color: T.red }}>− Costs: {fmtGP(p.annualCosts)}</div>}
+                    </div>
+                  )}
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontWeight: 700, fontSize: 16 }}>{fmtNum(p.totalBookings)}</div>
@@ -542,9 +670,10 @@ function OverrideSlider({ label, globalValue, override, onSet, onReset, min, max
   );
 }
 
-function CountryAssumptionsPanel({ countries, gpPerBooking, gpOverrides, setGpOverrides, apiAttachRates, apiRateOverrides, setApiRateOverrides, wlConversionRates, wlRateOverrides, setWlRateOverrides }) {
+function CountryAssumptionsPanel({ countries, priceDefaults, gmDefaults, priceOverrides, setPriceOverrides, gmOverrides, setGmOverrides, apiAttachRates, apiRateOverrides, setApiRateOverrides, wlConversionRates, wlRateOverrides, setWlRateOverrides }) {
   const [selectedCid, setSelectedCid] = useState(countries[0]?.id ?? "");
   const country = countries.find(c => c.id === selectedCid);
+  const market = COUNTRY_TO_MARKET[selectedCid];
 
   const setOverride = (setter, p, val) =>
     setter(prev => ({ ...prev, [selectedCid]: { ...(prev[selectedCid] || {}), [p]: val } }));
@@ -560,7 +689,8 @@ function CountryAssumptionsPanel({ countries, gpPerBooking, gpOverrides, setGpOv
     });
 
   const overrideCount = (cid) =>
-    Object.keys(gpOverrides[cid] || {}).length +
+    Object.keys(priceOverrides[cid] || {}).length +
+    Object.keys(gmOverrides[cid] || {}).length +
     Object.keys(apiRateOverrides[cid] || {}).length +
     Object.keys(wlRateOverrides[cid] || {}).length;
 
@@ -587,15 +717,35 @@ function CountryAssumptionsPanel({ countries, gpPerBooking, gpOverrides, setGpOv
       </div>
       {country && (
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.grey2}` }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>GP Per Booking — {country.name}</div>
-            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>Override global GP values for this market. Orange = market-specific value active.</div>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.orange}40` }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Price Per Booking (£) — {country.name}</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>
+              Override the {market} market price for this country specifically. Orange = country-level override active.
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
               {PRODUCTS.map(p => (
                 <OverrideSlider key={p} label={p}
-                  globalValue={gpPerBooking[p] || 0} override={gpOverrides[selectedCid]?.[p]}
-                  onSet={val => setOverride(setGpOverrides, p, val)} onReset={() => resetOverride(setGpOverrides, p)}
-                  min={1} max={50} step={0.5} formatVal={v => `£${v.toFixed(2)}`} accentColor={T.orange} />
+                  globalValue={priceDefaults[p]?.[market] ?? priceDefaults[p]?.default ?? 0}
+                  override={priceOverrides[selectedCid]?.[p]}
+                  onSet={val => setOverride(setPriceOverrides, p, val)}
+                  onReset={() => resetOverride(setPriceOverrides, p)}
+                  min={1} max={400} step={1} formatVal={v => `£${v.toFixed(0)}`} accentColor={T.orange} />
+              ))}
+            </div>
+          </div>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.green}40` }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Gross Margin % — {country.name}</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>
+              Override the {market} market GM% for this country specifically. Green = country-level override active.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              {PRODUCTS.map(p => (
+                <OverrideSlider key={p} label={p}
+                  globalValue={gmDefaults[p]?.[market] ?? gmDefaults[p]?.default ?? 0}
+                  override={gmOverrides[selectedCid]?.[p]}
+                  onSet={val => setOverride(setGmOverrides, p, val)}
+                  onReset={() => resetOverride(setGmOverrides, p)}
+                  min={0.01} max={0.5} step={0.005} formatVal={v => `${(v * 100).toFixed(1)}%`} accentColor={T.green} />
               ))}
             </div>
           </div>
@@ -629,8 +779,10 @@ function CountryAssumptionsPanel({ countries, gpPerBooking, gpOverrides, setGpOv
   );
 }
 
-function AssumptionsPanel({ gpPerBooking, setGpPerBooking, apiAttachRates, setApiAttachRates, wlConversionRates, setWlConversionRates, paxDivisor, setPaxDivisor, countries, setCountries, gpOverrides, setGpOverrides, apiRateOverrides, setApiRateOverrides, wlRateOverrides, setWlRateOverrides }) {
+function AssumptionsPanel({ priceDefaults, setPriceDefaults, gmDefaults, setGmDefaults, priceOverrides, setPriceOverrides, gmOverrides, setGmOverrides, apiAttachRates, setApiAttachRates, wlConversionRates, setWlConversionRates, paxDivisor, setPaxDivisor, countries, apiRateOverrides, setApiRateOverrides, wlRateOverrides, setWlRateOverrides }) {
   const [view, setView] = useState("global");
+  const [selectedMarket, setSelectedMarket] = useState(MARKETS[0]);
+
   return (
     <div>
       <SectionHeader title="Forecast Assumptions" sub="Adjust any value — forecast updates instantly across all views" />
@@ -655,23 +807,66 @@ function AssumptionsPanel({ gpPerBooking, setGpPerBooking, apiAttachRates, setAp
             <div style={{ fontSize: 11, color: T.greyText, marginTop: 4 }}>1 booking per {paxDivisor.toFixed(1)} passengers</div>
           </div>
           <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.grey2}` }}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>GP Per Booking — Global (£)</div>
-            {PRODUCTS.map(p => (
-              <div key={p} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, width: 140, flexShrink: 0 }}>{p}</label>
-                <input type="range" min={1} max={50} step={0.5} value={gpPerBooking[p] || 0} onChange={e => setGpPerBooking(prev => ({ ...prev, [p]: Number(e.target.value) }))} style={{ flex: 1, accentColor: T.purple }} />
-                <span style={{ fontWeight: 700, color: T.purple, minWidth: 44, textAlign: "right" }}>£{(gpPerBooking[p] || 0).toFixed(2)}</span>
-              </div>
-            ))}
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>Market to Edit</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {MARKETS.map(m => (
+                <button key={m} onClick={() => setSelectedMarket(m)} style={{
+                  padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                  border: `1px solid ${selectedMarket === m ? T.purple : T.grey2}`,
+                  background: selectedMarket === m ? T.purpleTint : T.white,
+                  color: selectedMarket === m ? T.purple : T.greyText,
+                }}>{m}</button>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.orange}40`, gridColumn: "1 / -1" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>💰 Price Per Booking (£) — {selectedMarket}</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>Average booking value by product for the {selectedMarket} market. ⚠️ Placeholder values — update with BigQuery results.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              {PRODUCTS.map(p => (
+                <div key={p}>
+                  <label style={ASSUMPTION_LABEL_STYLE}>{p}</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input type="range" min={1} max={400} step={1}
+                      value={priceDefaults[p]?.[selectedMarket] ?? priceDefaults[p]?.default ?? 0}
+                      onChange={e => setPriceDefaults(prev => ({ ...prev, [p]: { ...prev[p], [selectedMarket]: Number(e.target.value) } }))}
+                      style={{ flex: 1, accentColor: T.orange }} />
+                    <span style={{ fontWeight: 700, color: T.orange, minWidth: 44, textAlign: "right" }}>
+                      £{(priceDefaults[p]?.[selectedMarket] ?? priceDefaults[p]?.default ?? 0).toFixed(0)}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.green}40`, gridColumn: "1 / -1" }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>📈 Gross Margin % — {selectedMarket}</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>GM% on each product for the {selectedMarket} market. ⚠️ Placeholder values — update with BigQuery results.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+              {PRODUCTS.map(p => (
+                <div key={p}>
+                  <label style={ASSUMPTION_LABEL_STYLE}>{p}</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input type="range" min={0.01} max={0.5} step={0.005}
+                      value={gmDefaults[p]?.[selectedMarket] ?? gmDefaults[p]?.default ?? 0}
+                      onChange={e => setGmDefaults(prev => ({ ...prev, [p]: { ...prev[p], [selectedMarket]: Number(e.target.value) } }))}
+                      style={{ flex: 1, accentColor: T.green }} />
+                    <span style={{ fontWeight: 700, color: T.green, minWidth: 44, textAlign: "right" }}>
+                      {((gmDefaults[p]?.[selectedMarket] ?? gmDefaults[p]?.default ?? 0) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.blue}`, gridColumn: "1 / -1" }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>🔌 API Attach Rates by Product — Global</div>
-            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>% of bookings via partner API where the customer adds each product</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>% of partner pax who add each product via API</div>
             <RateSliders rates={apiAttachRates} setRates={setApiAttachRates} accentColor={T.blue} />
           </div>
           <div style={{ background: T.white, borderRadius: 12, padding: 20, border: `1px solid ${T.purple}`, gridColumn: "1 / -1" }}>
             <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>🏷️ White Label Conversion Rates by Product — Global</div>
-            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>% of customers who visit the white label page and complete a purchase</div>
+            <div style={{ fontSize: 12, color: T.greyText, marginBottom: 16 }}>% of WL visitors who complete a purchase per product</div>
             <RateSliders rates={wlConversionRates} setRates={setWlConversionRates} accentColor={T.purple} />
           </div>
         </div>
@@ -680,7 +875,9 @@ function AssumptionsPanel({ gpPerBooking, setGpPerBooking, apiAttachRates, setAp
       {view === "by-country" && (
         <CountryAssumptionsPanel
           countries={countries}
-          gpPerBooking={gpPerBooking} gpOverrides={gpOverrides} setGpOverrides={setGpOverrides}
+          priceDefaults={priceDefaults} gmDefaults={gmDefaults}
+          priceOverrides={priceOverrides} setPriceOverrides={setPriceOverrides}
+          gmOverrides={gmOverrides} setGmOverrides={setGmOverrides}
           apiAttachRates={apiAttachRates} apiRateOverrides={apiRateOverrides} setApiRateOverrides={setApiRateOverrides}
           wlConversionRates={wlConversionRates} wlRateOverrides={wlRateOverrides} setWlRateOverrides={setWlRateOverrides}
         />
@@ -689,9 +886,11 @@ function AssumptionsPanel({ gpPerBooking, setGpPerBooking, apiAttachRates, setAp
   );
 }
 
-function ScenarioComparison({ countries, availability, gpPerBooking, apiAttachRates, wlConversionRates, paxDivisor, gpOverrides, apiRateOverrides, wlRateOverrides }) {
+function ScenarioComparison({ countries, availability, priceDefaults, gmDefaults, priceOverrides, gmOverrides, apiAttachRates, wlConversionRates, paxDivisor, apiRateOverrides, wlRateOverrides }) {
   const { scenarios, countryChartData } = useMemo(() => {
-    const getGP      = (cid, p) => gpOverrides[cid]?.[p]      ?? gpPerBooking[p]      ?? 0;
+    const getPrice   = (cid, p) => priceOverrides[cid]?.[p] ?? priceDefaults[p]?.[COUNTRY_TO_MARKET[cid]] ?? priceDefaults[p]?.default ?? 0;
+    const getGMPct   = (cid, p) => gmOverrides[cid]?.[p]    ?? gmDefaults[p]?.[COUNTRY_TO_MARKET[cid]]    ?? gmDefaults[p]?.default    ?? 0;
+    const getGP      = (cid, p) => getPrice(cid, p) * getGMPct(cid, p);
     const getApiRate = (cid, p) => apiRateOverrides[cid]?.[p] ?? apiAttachRates[p]    ?? 0;
     const getWlRate  = (cid, p) => wlRateOverrides[cid]?.[p]  ?? wlConversionRates[p] ?? 0;
     const blendedRate = (cid, p) => (getApiRate(cid, p) + getWlRate(cid, p)) / 2;
@@ -720,7 +919,7 @@ function ScenarioComparison({ countries, availability, gpPerBooking, apiAttachRa
       return { name: c.name, Conservative: Math.round(gpForMult(0.6)/1000), Base: Math.round(gpForMult(1.0)/1000), Stretch: Math.round(gpForMult(1.4)/1000) };
     });
     return { scenarios, countryChartData };
-  }, [countries, availability, gpPerBooking, apiAttachRates, wlConversionRates, paxDivisor, gpOverrides, apiRateOverrides, wlRateOverrides]);
+  }, [countries, availability, priceDefaults, gmDefaults, priceOverrides, gmOverrides, apiAttachRates, wlConversionRates, paxDivisor, apiRateOverrides, wlRateOverrides]);
 
   const chartData = Object.entries(scenarios).map(([name, s]) => ({ name: name.charAt(0).toUpperCase() + name.slice(1), GP: Math.round(s.gp / 1000) }));
 
@@ -780,10 +979,12 @@ function App() {
   const [countries, setCountries] = useState(INITIAL_COUNTRIES);
   const [availability, setAvailability] = useState(INITIAL_AVAILABILITY);
   const [partners, setPartners] = useState(INITIAL_PARTNERS);
-  const [gpPerBooking, setGpPerBooking] = useState(GP_DEFAULTS);
+  const [priceDefaults, setPriceDefaults] = useState(PRICE_DEFAULTS);
+  const [gmDefaults, setGmDefaults] = useState(GM_DEFAULTS);
+  const [priceOverrides, setPriceOverrides] = useState({});
+  const [gmOverrides, setGmOverrides] = useState({});
   const [apiAttachRates, setApiAttachRates] = useState(API_AR_DEFAULTS);
   const [wlConversionRates, setWlConversionRates] = useState(WL_CR_DEFAULTS);
-  const [gpOverrides, setGpOverrides] = useState({});
   const [apiRateOverrides, setApiRateOverrides] = useState({});
   const [wlRateOverrides, setWlRateOverrides] = useState({});
   const [paxDivisor, setPaxDivisor] = useState(2.4);
@@ -792,9 +993,12 @@ function App() {
   const forecast = useMemo(() => {
     const mult = SCENARIO_MULT[scenario];
     const countryById = new Map(countries.map(c => [c.id, c]));
-    const getGP      = (cid, p) => gpOverrides[cid]?.[p]       ?? gpPerBooking[p]      ?? 0;
-    const getApiRate = (cid, p) => apiRateOverrides[cid]?.[p]  ?? apiAttachRates[p]    ?? 0;
-    const getWlRate  = (cid, p) => wlRateOverrides[cid]?.[p]   ?? wlConversionRates[p] ?? 0;
+
+    const getPrice   = (cid, p) => priceOverrides[cid]?.[p] ?? priceDefaults[p]?.[COUNTRY_TO_MARKET[cid]] ?? priceDefaults[p]?.default ?? 0;
+    const getGMPct   = (cid, p) => gmOverrides[cid]?.[p]    ?? gmDefaults[p]?.[COUNTRY_TO_MARKET[cid]]    ?? gmDefaults[p]?.default    ?? 0;
+    const getGP      = (cid, p) => getPrice(cid, p) * getGMPct(cid, p);
+    const getApiRate = (cid, p) => apiRateOverrides[cid]?.[p] ?? apiAttachRates[p]    ?? 0;
+    const getWlRate  = (cid, p) => wlRateOverrides[cid]?.[p]  ?? wlConversionRates[p] ?? 0;
     const blendedRate = (cid, p) => (getApiRate(cid, p) + getWlRate(cid, p)) / 2;
 
     const byCountry = countries.map(c => {
@@ -816,24 +1020,49 @@ function App() {
     });
 
     const byPartner = partners.map(pt => {
-      let totalBookings = 0, totalGP = 0;
+      const partnerCountries = pt.countries.map(cid => countryById.get(cid)).filter(Boolean);
+      const totalCountryPax = partnerCountries.reduce((s, c) => s + c.annualPax, 0);
+
+      let totalBookings = 0, grossRevenue = 0, grossGP = 0;
+      const gpByProduct = Object.fromEntries(PRODUCTS.map(p => [p, 0]));
+
       pt.countries.forEach(cid => {
         const c = countryById.get(cid); if (!c) return;
+        const paxShare = totalCountryPax > 0 ? c.annualPax / totalCountryPax : 1 / pt.countries.length;
+        const paxInCountry = pt.pax * paxShare;
+
         pt.products.forEach(p => {
           if (!isActive(availability[cid]?.[p] ?? "unknown")) return;
-          const basePax = (c.annualPax / paxDivisor) * PARTNER_CHANNEL_SHARE * mult;
-          if (pt.channel === CHANNEL.API || pt.channel === CHANNEL.BOTH) {
-            const bk = basePax * getApiRate(cid, p);
-            totalBookings += bk; totalGP += bk * getGP(cid, p);
-          }
-          if (pt.channel === CHANNEL.WHITE_LABEL || pt.channel === CHANNEL.BOTH) {
-            const bk = basePax * getWlRate(cid, p);
-            totalBookings += bk; totalGP += bk * getGP(cid, p);
-          }
+          const basePrice = getPrice(cid, p);
+          const effectivePrice = basePrice * (1 - (pt.discount?.value || 0) / 100);
+          const gmPct = getGMPct(cid, p);
+
+          const addBk = (bk) => {
+            totalBookings += bk;
+            grossRevenue  += bk * effectivePrice;
+            const g = bk * effectivePrice * gmPct;
+            grossGP += g;
+            gpByProduct[p] += g;
+          };
+
+          if (pt.channel === CHANNEL.API || pt.channel === CHANNEL.BOTH)
+            addBk(paxInCountry * getApiRate(cid, p) * mult);
+          if (pt.channel === CHANNEL.WHITE_LABEL || pt.channel === CHANNEL.BOTH)
+            addBk(paxInCountry * getWlRate(cid, p) * mult);
         });
       });
+
+      let netGP = grossGP;
+      if (pt.commission?.value > 0) {
+        netGP = pt.commission.type === "margin_share"
+          ? grossGP * (1 - pt.commission.value / 100)
+          : grossGP - grossRevenue * (pt.commission.value / 100);
+      }
+      if (pt.crCost?.enabled) netGP -= (pt.crCost.pencePerBooking / 100) * totalBookings;
+      netGP -= (pt.annualCosts || 0);
+
       return {
-        ...pt, totalBookings, totalGP,
+        ...pt, totalBookings, grossRevenue, grossGP, gpByProduct, totalGP: netGP,
         isAPI: pt.channel === CHANNEL.API || pt.channel === CHANNEL.BOTH,
         isWL:  pt.channel === CHANNEL.WHITE_LABEL || pt.channel === CHANNEL.BOTH,
       };
@@ -857,7 +1086,7 @@ function App() {
       apiOpp: byPartner.filter(p => p.isAPI).reduce((s, p) => s + p.totalGP, 0),
       wlOpp:  byPartner.filter(p => p.isWL).reduce((s, p) => s + p.totalGP, 0),
     };
-  }, [countries, availability, partners, gpPerBooking, apiAttachRates, wlConversionRates, gpOverrides, apiRateOverrides, wlRateOverrides, paxDivisor, scenario]);
+  }, [countries, availability, partners, priceDefaults, gmDefaults, apiAttachRates, wlConversionRates, priceOverrides, gmOverrides, apiRateOverrides, wlRateOverrides, paxDivisor, scenario]);
 
   const exportCSV = useCallback(() => {
     const rows = [["Country","Region","Annual Pax","Est Bookings","Forecast Bookings","Forecast GP","Gaps"].join(",")];
@@ -909,20 +1138,24 @@ function App() {
         {activeTab === "partners"    && <PartnersView forecast={forecast} setPartners={setPartners} />}
         {activeTab === "matrix"      && <AvailabilityMatrix countries={countries} availability={availability} setAvailability={setAvailability} />}
         {activeTab === "assumptions" && <AssumptionsPanel
-            gpPerBooking={gpPerBooking} setGpPerBooking={setGpPerBooking}
+            priceDefaults={priceDefaults} setPriceDefaults={setPriceDefaults}
+            gmDefaults={gmDefaults} setGmDefaults={setGmDefaults}
+            priceOverrides={priceOverrides} setPriceOverrides={setPriceOverrides}
+            gmOverrides={gmOverrides} setGmOverrides={setGmOverrides}
             apiAttachRates={apiAttachRates} setApiAttachRates={setApiAttachRates}
             wlConversionRates={wlConversionRates} setWlConversionRates={setWlConversionRates}
             paxDivisor={paxDivisor} setPaxDivisor={setPaxDivisor}
-            countries={countries} setCountries={setCountries}
-            gpOverrides={gpOverrides} setGpOverrides={setGpOverrides}
+            countries={countries}
             apiRateOverrides={apiRateOverrides} setApiRateOverrides={setApiRateOverrides}
             wlRateOverrides={wlRateOverrides} setWlRateOverrides={setWlRateOverrides}
           />}
         {activeTab === "scenarios"   && <ScenarioComparison
             countries={countries} availability={availability}
-            gpPerBooking={gpPerBooking} apiAttachRates={apiAttachRates} wlConversionRates={wlConversionRates}
+            priceDefaults={priceDefaults} gmDefaults={gmDefaults}
+            priceOverrides={priceOverrides} gmOverrides={gmOverrides}
+            apiAttachRates={apiAttachRates} wlConversionRates={wlConversionRates}
             paxDivisor={paxDivisor}
-            gpOverrides={gpOverrides} apiRateOverrides={apiRateOverrides} wlRateOverrides={wlRateOverrides}
+            apiRateOverrides={apiRateOverrides} wlRateOverrides={wlRateOverrides}
           />}
       </main>
     </div>
@@ -934,3 +1167,4 @@ root.render(<App />);
   </script>
 </body>
 </html>
+chris.hogben@HX7128 ~ % 
