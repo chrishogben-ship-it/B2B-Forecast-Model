@@ -102,7 +102,7 @@ const API_AR_DEFAULTS = { Parking: 0.042, Hotels: 0.025, Lounges: 0.012, "Fast T
 // White label conversion rate: % of WL visitors who complete a purchase per product
 const WL_CR_DEFAULTS  = { Parking: 0.028, Hotels: 0.018, Lounges: 0.008, "Fast Track": 0.005, Transfers: 0.012, "Car Hire": 0.007 };
 const SCENARIO_MULT = { conservative: 0.6, base: 1.0, stretch: 1.4 };
-const EMPTY_PARTNER = { id: "", name: "", channel: CHANNEL.API, countries: [], products: [], pax: 0, committed: false, notes: "", annualCosts: 0, crCost: { enabled: false, pencePerBooking: 17 }, commission: { type: "margin_share", value: 0 }, discount: { value: 0 } };
+const EMPTY_PARTNER = { id: "", name: "", channel: CHANNEL.API, countries: [], countryPax: {}, products: [], pax: 0, committed: false, notes: "", annualCosts: 0, crCost: { enabled: false, pencePerBooking: 17 }, commission: { type: "margin_share", value: 0 }, discount: { value: 0 } };
 
 const isActive = (status) => status === "live" || status === "planned";
 const toggleInArray = (arr, val) => arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val];
@@ -421,13 +421,47 @@ function PartnerForm({ value, onChange, onSubmit, onCancel, submitLabel }) {
         <label style={ASSUMPTION_LABEL_STYLE}>Countries</label>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {INITIAL_COUNTRIES.map(c => (
-            <button key={c.id} onClick={() => onChange(x => ({ ...x, countries: toggleInArray(x.countries, c.id) }))}
+            <button key={c.id} onClick={() => onChange(x => {
+              const newCountries = toggleInArray(x.countries, c.id);
+              const even = newCountries.length > 0 ? +(100 / newCountries.length).toFixed(4) : 0;
+              return { ...x, countries: newCountries, countryPax: Object.fromEntries(newCountries.map(cid => [cid, even])) };
+            })}
               style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, border: `1px solid ${value.countries.includes(c.id) ? T.purple : T.grey2}`, background: value.countries.includes(c.id) ? T.purpleTint : T.white, color: value.countries.includes(c.id) ? T.purple : T.greyText, cursor: "pointer", fontWeight: 700 }}>
               {c.id}
             </button>
           ))}
         </div>
       </div>
+      {value.countries.length > 0 && (() => {
+        const splits = value.countryPax || {};
+        const totalPct = +value.countries.reduce((s, cid) => s + (splits[cid] ?? (100 / value.countries.length)), 0).toFixed(1);
+        const valid = Math.abs(totalPct - 100) < 0.5;
+        return (
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={ASSUMPTION_LABEL_STYLE}>
+              Pax Split by Country
+              <span style={{ fontSize: 11, marginLeft: 8, color: valid ? T.green : T.red, fontWeight: 700 }}>
+                {totalPct}%{!valid && " ⚠ must sum to 100%"}
+              </span>
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 6 }}>
+              {value.countries.map(cid => {
+                const pct = splits[cid] ?? (100 / value.countries.length);
+                return (
+                  <div key={cid} style={{ display: "flex", alignItems: "center", gap: 6, background: T.grey4, borderRadius: 6, padding: "5px 8px" }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, width: 28, color: T.purple }}>{cid}</span>
+                    <input type="number" min={0} max={100} step={1} value={+pct.toFixed(1)}
+                      onChange={e => onChange(x => ({ ...x, countryPax: { ...(x.countryPax || {}), [cid]: Number(e.target.value) || 0 } }))}
+                      style={{ width: 54, border: `1px solid ${T.grey2}`, borderRadius: 4, padding: "3px 6px", fontSize: 12, fontFamily: "inherit" }} />
+                    <span style={{ fontSize: 11, color: T.greyText }}>%</span>
+                    <span style={{ fontSize: 11, color: T.purple, fontWeight: 600, marginLeft: "auto" }}>{fmtNum(Math.round(value.pax * pct / 100))}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
       <div>
         <label style={ASSUMPTION_LABEL_STYLE}>Products</label>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
@@ -1001,8 +1035,18 @@ function App() {
     const getWlRate  = (cid, p) => wlRateOverrides[cid]?.[p]  ?? wlConversionRates[p] ?? 0;
     const blendedRate = (cid, p) => (getApiRate(cid, p) + getWlRate(cid, p)) / 2;
 
+    // Aggregate partner pax per country (using explicit splits)
+    const partnerPaxByCountry = {};
+    partners.forEach(pt => {
+      const defaultPct = pt.countries.length > 0 ? 100 / pt.countries.length : 0;
+      pt.countries.forEach(cid => {
+        const pct = pt.countryPax?.[cid] ?? defaultPct;
+        partnerPaxByCountry[cid] = (partnerPaxByCountry[cid] || 0) + pt.pax * pct / 100;
+      });
+    });
+
     const byCountry = countries.map(c => {
-      const bookings = c.annualPax / paxDivisor;
+      const partnerPax = partnerPaxByCountry[c.id] || 0;
       let totalBookings = 0, totalGP = 0;
       const gaps = [];
       if (!c.hxLang) gaps.push("Language not supported");
@@ -1010,26 +1054,24 @@ function App() {
       PRODUCTS.forEach(p => {
         const status = availability[c.id]?.[p] ?? "unknown";
         if (isActive(status)) {
-          const bk = bookings * blendedRate(c.id, p) * mult;
+          const bk = partnerPax * blendedRate(c.id, p) * mult;
           totalBookings += bk; totalGP += bk * getGP(c.id, p);
         } else if (status === "not available") {
           gaps.push(`${p} unavailable`);
         }
       });
-      return { ...c, estBookings: bookings, totalBookings, totalGP, gaps };
+      return { ...c, annualPax: Math.round(partnerPax), estBookings: partnerPax, totalBookings, totalGP, gaps };
     });
 
     const byPartner = partners.map(pt => {
-      const partnerCountries = pt.countries.map(cid => countryById.get(cid)).filter(Boolean);
-      const totalCountryPax = partnerCountries.reduce((s, c) => s + c.annualPax, 0);
+      const defaultPct = pt.countries.length > 0 ? 100 / pt.countries.length : 0;
 
       let totalBookings = 0, grossRevenue = 0, grossGP = 0;
       const gpByProduct = Object.fromEntries(PRODUCTS.map(p => [p, 0]));
 
       pt.countries.forEach(cid => {
         const c = countryById.get(cid); if (!c) return;
-        const paxShare = totalCountryPax > 0 ? c.annualPax / totalCountryPax : 1 / pt.countries.length;
-        const paxInCountry = pt.pax * paxShare;
+        const paxInCountry = pt.pax * ((pt.countryPax?.[cid] ?? defaultPct) / 100);
 
         pt.products.forEach(p => {
           if (!isActive(availability[cid]?.[p] ?? "unknown")) return;
