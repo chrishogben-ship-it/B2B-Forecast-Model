@@ -102,7 +102,7 @@ const API_AR_DEFAULTS = { Parking: 0.042, Hotels: 0.025, Lounges: 0.012, "Fast T
 // White label conversion rate: % of WL visitors who complete a purchase per product
 const WL_CR_DEFAULTS  = { Parking: 0.028, Hotels: 0.018, Lounges: 0.008, "Fast Track": 0.005, Transfers: 0.012, "Car Hire": 0.007 };
 const SCENARIO_MULT = { conservative: 0.6, base: 1.0, stretch: 1.4 };
-const EMPTY_PARTNER = { id: "", name: "", channel: CHANNEL.API, countries: [], countryPax: {}, products: [], pax: 0, committed: false, notes: "", annualCosts: 0, crCost: { enabled: false, pencePerBooking: 17 }, commission: { type: "margin_share", value: 0 }, discount: { value: 0 } };
+const EMPTY_PARTNER = { id: "", name: "", channel: CHANNEL.API, countries: [], countryPax: {}, products: [], pax: 0, committed: false, notes: "", annualCosts: 0, crCost: { enabled: false, pencePerBooking: 17 }, commission: { type: "margin_share", byProduct: {} }, discount: { value: 0 } };
 
 const isActive = (status) => status === "live" || status === "planned";
 const toggleInArray = (arr, val) => arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val];
@@ -394,19 +394,28 @@ function PartnerForm({ value, onChange, onSubmit, onCancel, submitLabel }) {
         <input type="number" value={value.annualCosts || 0} onChange={e => onChange(x => ({ ...x, annualCosts: Number(e.target.value) || 0 }))}
           placeholder="e.g. marketing fund" style={inp()} />
       </div>
-      <div>
+      <div style={{ gridColumn: "1 / -1" }}>
         <label style={ASSUMPTION_LABEL_STYLE}>Commission Driver</label>
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ marginBottom: 8 }}>
           <select value={value.commission?.type || "margin_share"} onChange={e => onChange(x => ({ ...x, commission: { ...(x.commission || {}), type: e.target.value } }))}
-            style={{ ...inp(), flex: 2, padding: "6px 6px" }}>
-            <option value="margin_share">Margin Share %</option>
-            <option value="fixed_percent">Fixed % of Price</option>
+            style={{ ...inp(), maxWidth: 200 }}>
+            <option value="margin_share">% of GP (Margin Share)</option>
+            <option value="fixed_percent">% of Revenue (Fixed)</option>
           </select>
-          <input type="number" min={0} max={100} step={0.5} value={value.commission?.value || 0}
-            onChange={e => onChange(x => ({ ...x, commission: { ...(x.commission || {}), value: Number(e.target.value) || 0 } }))}
-            style={{ ...inp(), width: 60 }} />
-          <span style={{ alignSelf: "center", fontSize: 12, color: T.greyText, flexShrink: 0 }}>%</span>
         </div>
+        {value.products.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 6 }}>
+            {value.products.map(p => (
+              <div key={p} style={{ display: "flex", alignItems: "center", gap: 6, background: T.grey4, borderRadius: 6, padding: "5px 8px" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, flex: 1, color: T.black }}>{p}</span>
+                <input type="number" min={0} max={100} step={0.5} value={value.commission?.byProduct?.[p] ?? 0}
+                  onChange={e => onChange(x => ({ ...x, commission: { ...x.commission, byProduct: { ...(x.commission?.byProduct || {}), [p]: Number(e.target.value) || 0 } } }))}
+                  style={{ width: 50, border: `1px solid ${T.grey2}`, borderRadius: 4, padding: "3px 6px", fontSize: 12, fontFamily: "inherit" }} />
+                <span style={{ fontSize: 11, color: T.greyText }}>%</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div>
         <label style={ASSUMPTION_LABEL_STYLE}>Price Discount</label>
@@ -554,9 +563,9 @@ function PartnersView({ forecast, setPartners }) {
                         Gross: {fmtGP(p.grossGP)}
                         {(p.discount?.value || 0) > 0 && <span style={{ color: T.orange }}> (incl. {p.discount.value}% discount)</span>}
                       </div>
-                      {(p.commission?.value || 0) > 0 && (
+                      {(p.commissionTotal || 0) > 0 && (
                         <div style={{ color: T.red }}>
-                          − Commission ({p.commission.type === "margin_share" ? `${p.commission.value}% margin` : `${p.commission.value}% rev`})
+                          − Commission ({p.commission?.type === "margin_share" ? "margin share" : "% of rev"}): {fmtGP(p.commissionTotal)}
                         </div>
                       )}
                       {p.crCost?.enabled && <div style={{ color: T.red }}>− CRC ({p.crCost.pencePerBooking}p/bkg)</div>}
@@ -1068,6 +1077,7 @@ function App() {
 
       let totalBookings = 0, grossRevenue = 0, grossGP = 0;
       const gpByProduct = Object.fromEntries(PRODUCTS.map(p => [p, 0]));
+      const revByProduct = Object.fromEntries(PRODUCTS.map(p => [p, 0]));
 
       pt.countries.forEach(cid => {
         const c = countryById.get(cid); if (!c) return;
@@ -1081,8 +1091,10 @@ function App() {
 
           const addBk = (bk) => {
             totalBookings += bk;
-            grossRevenue  += bk * effectivePrice;
-            const g = bk * effectivePrice * gmPct;
+            const rev = bk * effectivePrice;
+            grossRevenue  += rev;
+            revByProduct[p] += rev;
+            const g = rev * gmPct;
             grossGP += g;
             gpByProduct[p] += g;
           };
@@ -1094,17 +1106,22 @@ function App() {
         });
       });
 
-      let netGP = grossGP;
-      if (pt.commission?.value > 0) {
-        netGP = pt.commission.type === "margin_share"
-          ? grossGP * (1 - pt.commission.value / 100)
-          : grossGP - grossRevenue * (pt.commission.value / 100);
-      }
+      let commissionTotal = 0;
+      const commByProduct = pt.commission?.byProduct || {};
+      PRODUCTS.forEach(p => {
+        const rate = (commByProduct[p] ?? 0) / 100;
+        if (rate > 0) {
+          commissionTotal += pt.commission?.type === "fixed_percent"
+            ? revByProduct[p] * rate
+            : gpByProduct[p] * rate;
+        }
+      });
+      let netGP = grossGP - commissionTotal;
       if (pt.crCost?.enabled) netGP -= (pt.crCost.pencePerBooking / 100) * totalBookings;
       netGP -= (pt.annualCosts || 0);
 
       return {
-        ...pt, totalBookings, grossRevenue, grossGP, gpByProduct, totalGP: netGP,
+        ...pt, totalBookings, grossRevenue, grossGP, gpByProduct, commissionTotal, totalGP: netGP,
         isAPI: pt.channel === CHANNEL.API || pt.channel === CHANNEL.BOTH,
         isWL:  pt.channel === CHANNEL.WHITE_LABEL || pt.channel === CHANNEL.BOTH,
       };
